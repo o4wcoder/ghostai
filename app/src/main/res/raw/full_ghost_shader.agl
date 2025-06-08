@@ -1,0 +1,6 @@
+uniform float2 iResolution;
+
+half4 main(float2 fragCoord) {
+    float2 uv = fragCoord / iResolution;
+    return half4(uv.x, uv.y, 0.0, 1.0);
+}

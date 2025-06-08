@@ -14,8 +14,7 @@ import com.example.ghostai.ui.theme.GhostAITheme
 fun MainScreen() {
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-       // AnimatedMistyBackground()
-        Ghost(isSpeaking = false, modifier = Modifier.align(Alignment.Center))
+        Ghost(modifier = Modifier.align(Alignment.Center))
     }
 }
 
