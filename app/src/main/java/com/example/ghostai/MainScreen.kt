@@ -11,11 +11,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.example.ghostai.ui.theme.GhostAITheme
 
 @Composable
-fun MainScreen() {
+fun MainScreen(isSpeaking: Boolean) {
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         GhostMistBackground()
-        FullShaderGhost(isSpeaking = false, modifier = Modifier.align(Alignment.Center))
+        FullShaderGhost(isSpeaking = isSpeaking, modifier = Modifier.align(Alignment.Center))
     }
 }
 
@@ -23,7 +23,7 @@ fun MainScreen() {
 @Composable
 private fun PreviewMainScreen() {
     GhostAITheme {
-        MainScreen()
+        MainScreen(false)
 
     }
 }
