@@ -1,0 +1,54 @@
+uniform float2 iResolution;
+uniform float iTime;
+uniform float isSpeaking;
+
+half4 main(float2 fragCoord) {
+    float2 uv = fragCoord / iResolution;
+
+    // Centered UV with vertical squish for head/body shaping
+    float2 center = float2(0.5, 0.4);
+    float2 ghostUV = uv;
+    ghostUV.y *= 1.2;
+
+    // Pulsating circular head/body
+    float t = mod(iTime, 6.2831);
+    float pulse = 0.25 + 0.03 * sin(t);
+    float dist = distance(ghostUV, center);
+    float bodyCircle = smoothstep(pulse + 0.1, pulse - 0.1, dist);
+
+    // Wavy tail mask — vertical gradient with sine wave offset
+    float tailY = smoothstep(0.5, 0.9, uv.y); // active only in lower half
+    float wave = 0.015 * sin(uv.y * 30.0 + t * 2.0); // horizontal wobble
+    float tailX = abs(uv.x - 0.5 + wave); // center-aligned wave
+    float tailMask = smoothstep(0.22, 0.0, tailX) * tailY;
+
+    // Combined body: circle head + wavy tail
+    float body = max(bodyCircle, tailMask);
+
+    // Eyes
+    float2 leftEye = float2(0.43, 0.38);
+    float2 rightEye = float2(0.57, 0.38);
+    float eyeRadius = 0.015;
+
+    float leftDist = distance(uv, leftEye);
+    float rightDist = distance(uv, rightEye);
+    float blink = step(0.02, abs(sin(iTime * 1.5)));
+    float leftEyeMask = smoothstep(eyeRadius + 0.005, eyeRadius - 0.005, leftDist) * blink;
+    float rightEyeMask = smoothstep(eyeRadius + 0.005, eyeRadius - 0.005, rightDist) * blink;
+
+    float eye = leftEyeMask + rightEyeMask;
+
+    // Color and glow
+    float glow = isSpeaking * 0.3;
+    half3 color = mix(half3(0.0), half3(0.4 + glow, 1.0, 0.4 + glow), body);
+
+    // Draw eyes in black
+    if (eye > 0.0) {
+        color = half3(0.0);
+    }
+
+    float alpha = max(body, eye);
+    return half4(color, alpha);
+}
+
+

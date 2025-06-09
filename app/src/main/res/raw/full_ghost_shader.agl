@@ -1,6 +1,54 @@
 uniform float2 iResolution;
+uniform float iTime;
+uniform float isSpeaking;
 
 half4 main(float2 fragCoord) {
     float2 uv = fragCoord / iResolution;
-    return half4(uv.x, uv.y, 0.0, 1.0);
+    uv -= 0.5;
+    uv.y *= 1.2;
+
+    // Wavy tail
+    float tailWave = 0.05 * sin(uv.x * 12.0 + iTime * 2.0);
+    float tailFactor = smoothstep(0.0, -0.3, uv.y);
+    uv.y += tailWave * tailFactor;
+
+    // Ghost body
+    float radius = 0.4;
+    float dist = length(uv);
+    float body = smoothstep(radius, radius - 0.1, dist);
+
+    // Eye blinking animation (squash vertically)
+    float blinkSpeed = 0.5;
+    float blinkPhase = abs(sin(iTime * blinkSpeed));
+    float blinkScale = mix(1.0, 0.1, smoothstep(0.95, 1.0, blinkPhase)); // 1.0 when open, 0.1 when blinking
+
+    // Eyes
+    float2 leftEye = float2(-0.15, 0.05);
+    float2 rightEye = float2(0.15, 0.05);
+    float eyeRadius = 0.05;
+
+    float2 eyeUV = uv;
+
+    // Apply vertical squash to eye UV
+    eyeUV.y /= blinkScale;
+
+    float leftEyeDist = length(eyeUV - leftEye);
+    float rightEyeDist = length(eyeUV - rightEye);
+
+    float leftEyeAlpha = smoothstep(eyeRadius + 0.01, eyeRadius - 0.01, leftEyeDist);
+    float rightEyeAlpha = smoothstep(eyeRadius + 0.01, eyeRadius - 0.01, rightEyeDist);
+
+    float eyes = leftEyeAlpha + rightEyeAlpha;
+
+    float alpha = body * (1.0 - eyes);
+
+    float glow = 0.4 + 0.4 * isSpeaking;
+    float3 color = mix(float3(0.0), float3(0.2 + glow, 1.0, 0.2 + glow), body);
+
+    // Overdraw eyes in black
+    if (eyes > 0.0) {
+        color = float3(0.0);
+    }
+
+    return half4(color, max(alpha, eyes));
 }
