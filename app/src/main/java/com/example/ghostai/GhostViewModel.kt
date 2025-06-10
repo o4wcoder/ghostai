@@ -10,13 +10,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import java.util.Locale
 import javax.inject.Inject
 
 @HiltViewModel
-class GhostViewModel @Inject constructor(application: Application) : AndroidViewModel(application) {
+class GhostViewModel @Inject constructor(private val application: Application) : AndroidViewModel(application) {
 
     private val tts: TextToSpeech
+    private var speechRecognizerManager: SpeechRecognizerManager? = null
     private val _isSpeaking = MutableStateFlow(false)
     val isSpeaking: StateFlow<Boolean> = _isSpeaking.asStateFlow()
 
@@ -29,16 +31,28 @@ class GhostViewModel @Inject constructor(application: Application) : AndroidView
         }
     }
 
+    fun setSpeechRecognizer(manager: SpeechRecognizerManager) {
+        speechRecognizerManager = manager
+        speechRecognizerManager?.startListening()
+    }
+
     fun speak(text: String) {
         if (tts.isSpeaking) return
 
-            _isSpeaking.value = true
-            tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "ghost-utterance")
-        // Monitor when it stops
+                tts.voices.forEach { voice ->
+            Timber.d("Voice: ${voice.name}, Locale: ${voice.locale}, Features: ${voice.features}")
+        }
+
+        _isSpeaking.value = true
+        tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "ghost-utterance")
         viewModelScope.launch {
             delayWhileSpeaking()
             _isSpeaking.value = false
         }
+    }
+
+    fun stopListening() {
+        speechRecognizerManager?.stopListening()
     }
 
     private suspend fun delayWhileSpeaking() {
@@ -50,5 +64,7 @@ class GhostViewModel @Inject constructor(application: Application) : AndroidView
     override fun onCleared() {
         super.onCleared()
         tts.shutdown()
+        speechRecognizerManager?.destroy()
     }
 }
+
