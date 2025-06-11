@@ -7,7 +7,7 @@ half4 main(float2 fragCoord) {
     uv -= 0.5;
     uv.y *= 1.2;
 
-    // Wavy tail
+    // Tail animation
     float tailWave = 0.05 * sin(uv.x * 12.0 + iTime * 2.0);
     float tailFactor = smoothstep(0.0, -0.3, uv.y);
     uv.y += tailWave * tailFactor;
@@ -17,38 +17,42 @@ half4 main(float2 fragCoord) {
     float dist = length(uv);
     float body = smoothstep(radius, radius - 0.1, dist);
 
-    // Eye blinking animation (squash vertically)
-    float blinkSpeed = 0.5;
-    float blinkPhase = abs(sin(iTime * blinkSpeed));
-    float blinkScale = mix(1.0, 0.1, smoothstep(0.95, 1.0, blinkPhase)); // 1.0 when open, 0.1 when blinking
+    // ==== BLINK TIMING ====
+    // Change seed every few seconds
+    float blinkSeed = floor(iTime / 6.0);
+    float rand = fract(sin(blinkSeed * 91.345) * 47453.25);
+    float nextBlinkTime = blinkSeed * 6.0 + rand * 3.0; // blink happens between 6–9s
+    float blinkDuration = 0.15;
 
-    // Eyes
+    // Determine if currently blinking
+    float timeSinceBlink = iTime - nextBlinkTime;
+    float isBlinking = step(0.0, timeSinceBlink) * step(timeSinceBlink, blinkDuration);
+
+    // Eyes open by default; squashed vertically when blinking
+    float eyeRadiusX = 0.05;
+    float eyeRadiusY = mix(0.05, 0.005, isBlinking); // squash vertically during blink
+
     float2 leftEye = float2(-0.15, 0.05);
     float2 rightEye = float2(0.15, 0.05);
-    float eyeRadius = 0.05;
 
-    float2 eyeUV = uv;
+    float2 leftDelta = uv - leftEye;
+    float2 rightDelta = uv - rightEye;
 
-    // Apply vertical squash to eye UV
-    eyeUV.y /= blinkScale;
+    float leftEyeShape = step(length(float2(leftDelta.x / eyeRadiusX, leftDelta.y / eyeRadiusY)), 1.0);
+    float rightEyeShape = step(length(float2(rightDelta.x / eyeRadiusX, rightDelta.y / eyeRadiusY)), 1.0);
 
-    float leftEyeDist = length(eyeUV - leftEye);
-    float rightEyeDist = length(eyeUV - rightEye);
+    float eyes = leftEyeShape + rightEyeShape;
 
-    float leftEyeAlpha = smoothstep(eyeRadius + 0.01, eyeRadius - 0.01, leftEyeDist);
-    float rightEyeAlpha = smoothstep(eyeRadius + 0.01, eyeRadius - 0.01, rightEyeDist);
-
-    float eyes = leftEyeAlpha + rightEyeAlpha;
-
-    float alpha = body * (1.0 - eyes);
-
+    // Glow and final color
     float glow = 0.4 + 0.4 * isSpeaking;
     float3 color = mix(float3(0.0), float3(0.2 + glow, 1.0, 0.2 + glow), body);
 
-    // Overdraw eyes in black
     if (eyes > 0.0) {
-        color = float3(0.0);
+        color = float3(0.0); // black eyes
     }
 
-    return half4(color, max(alpha, eyes));
+    float alpha = max(body, eyes);
+    return half4(color, alpha);
 }
+
+
