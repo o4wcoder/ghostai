@@ -7,34 +7,40 @@ half4 main(float2 fragCoord) {
     uv -= 0.5;
     uv.y *= 1.2;
 
-    // Tail animation
-    float tailWave = 0.05 * sin(uv.x * 12.0 + iTime * 2.0);
-    float tailFactor = smoothstep(0.0, -0.3, uv.y);
-    uv.y += tailWave * tailFactor;
+    // === FLOATING MOTION ===
+    float floatOffset = 0.03 * sin(iTime * 0.7);
+    uv.y += floatOffset;
 
-    // Ghost body
+    // === Save floating UV for use in body and tail ===
+    float2 bodyUV = uv;
+
+    // === TAIL ANIMATION ===
+    float tailWave = 0.05 * sin(bodyUV.x * 12.0 + iTime * 2.0);
+    float tailFactor = smoothstep(0.0, -0.3, bodyUV.y);
+    bodyUV.y += tailWave * tailFactor;
+
+    // === BODY SHAPE ===
     float radius = 0.4;
-    float dist = length(uv);
+    float dist = length(bodyUV);
     float body = smoothstep(radius, radius - 0.1, dist);
 
-    // ==== BLINK TIMING ====
-    // Change seed every few seconds
+    // === BLINK TIMING ===
     float blinkSeed = floor(iTime / 6.0);
     float rand = fract(sin(blinkSeed * 91.345) * 47453.25);
-    float nextBlinkTime = blinkSeed * 6.0 + rand * 3.0; // blink happens between 6–9s
+    float nextBlinkTime = blinkSeed * 6.0 + rand * 3.0;
     float blinkDuration = 0.15;
-
-    // Determine if currently blinking
     float timeSinceBlink = iTime - nextBlinkTime;
     float isBlinking = step(0.0, timeSinceBlink) * step(timeSinceBlink, blinkDuration);
 
-    // Eyes open by default; squashed vertically when blinking
+    // === EYES ===
     float eyeRadiusX = 0.05;
-    float eyeRadiusY = mix(0.05, 0.005, isBlinking); // squash vertically during blink
+    float eyeRadiusY = mix(0.05, 0.005, isBlinking);
 
+    // Eye positions are static (relative to ghost center)
     float2 leftEye = float2(-0.15, 0.05);
     float2 rightEye = float2(0.15, 0.05);
 
+    // Calculate deltas using floating uv (same as ghost movement)
     float2 leftDelta = uv - leftEye;
     float2 rightDelta = uv - rightEye;
 
@@ -43,7 +49,7 @@ half4 main(float2 fragCoord) {
 
     float eyes = leftEyeShape + rightEyeShape;
 
-    // Glow and final color
+    // === COLOR ===
     float glow = 0.4 + 0.4 * isSpeaking;
     float3 color = mix(float3(0.0), float3(0.2 + glow, 1.0, 0.2 + glow), body);
 
@@ -54,5 +60,4 @@ half4 main(float2 fragCoord) {
     float alpha = max(body, eyes);
     return half4(color, alpha);
 }
-
 
