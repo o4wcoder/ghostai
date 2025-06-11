@@ -1,4 +1,4 @@
-package com.example.ghostai
+package com.example.ghostai.oldui
 
 import android.graphics.RuntimeShader
 import androidx.compose.animation.core.*
@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.Shader
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.example.ghostai.R
 
 @Composable
 fun FullShaderGhost(
@@ -22,7 +23,7 @@ fun FullShaderGhost(
     // Load the shader once
     val shader = remember {
         val shaderCode = context.resources
-            .openRawResource(R.raw.full_ghost_shader)
+            .openRawResource(R.raw.old_full_ghost_shader)
             .bufferedReader()
             .use { it.readText() }
         RuntimeShader(shaderCode)

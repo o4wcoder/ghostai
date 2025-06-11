@@ -1,9 +1,11 @@
-package com.example.ghostai
+package com.example.ghostai.oldui
 
 import android.graphics.RuntimeShader
 import android.util.Log
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -12,6 +14,7 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.ghostai.R
 
 @Composable
 fun Ghost(modifier: Modifier = Modifier) {
@@ -57,7 +60,7 @@ fun rememberGhostShader(): RuntimeShader {
     val context = LocalContext.current
     return remember {
         val shaderCode = context.resources
-            .openRawResource(R.raw.ghost_shader)
+            .openRawResource(R.raw.old_ghost_shader)
             .bufferedReader()
             .use { it.readText() }
         Log.d("GhostShader", "Shader code:\n$shaderCode")
@@ -91,10 +94,10 @@ fun GhostPreview() {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            androidx.compose.material3.Button(onClick = {
+            Button(onClick = {
                 isSpeaking = !isSpeaking
             }) {
-                androidx.compose.material3.Text(if (isSpeaking) "Quiet" else "Speak")
+                Text(if (isSpeaking) "Quiet" else "Speak")
             }
         }
     }

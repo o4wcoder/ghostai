@@ -1,0 +1,96 @@
+uniform float2 iResolution;
+uniform float iTime;
+uniform float isSpeaking;
+
+float hash(float2 p) {
+    return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453123);
+}
+
+float noise(float2 p) {
+    float2 i = floor(p);
+    float2 f = fract(p);
+
+    float a = hash(i);
+    float b = hash(i + float2(1.0, 0.0));
+    float c = hash(i + float2(0.0, 1.0));
+    float d = hash(i + float2(1.0, 1.0));
+
+    float2 u = f * f * (3.0 - 2.0 * f);
+    return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+}
+
+float fbm(float2 p) {
+    float v = 0.0;
+    float a = 0.5;
+    float2 shift = float2(100.0);
+    for (int i = 0; i < 5; ++i) {
+        v += a * noise(p);
+        p = p * 2.0 + shift;
+        a *= 0.5;
+    }
+    return v;
+}
+
+half4 main(float2 fragCoord) {
+    float2 uv = fragCoord / iResolution;
+    float2 centered = (fragCoord - 0.5 * iResolution) / min(iResolution.x, iResolution.y);
+
+    // FLOATING OFFSET
+    float floatOffset = 0.03 * sin(iTime * 0.7);
+    centered.y += floatOffset;
+
+    float2 bodyUV = centered;
+
+    // TAIL
+    float tailWave = 0.05 * sin(bodyUV.x * 12.0 + iTime * 2.0);
+    float tailFactor = smoothstep(0.0, -0.3, bodyUV.y);
+    bodyUV.y += tailWave * tailFactor;
+
+    // BODY
+    float radius = 0.4;
+    float dist = length(bodyUV);
+    float body = smoothstep(radius, radius - 0.1, dist);
+
+    // BLINKING
+    float blinkSeed = floor(iTime / 6.0);
+    float rand = fract(sin(blinkSeed * 91.345) * 47453.25);
+    float nextBlinkTime = blinkSeed * 6.0 + rand * 3.0;
+    float blinkDuration = 0.15;
+    float timeSinceBlink = iTime - nextBlinkTime;
+    float isBlinking = step(0.0, timeSinceBlink) * step(timeSinceBlink, blinkDuration);
+
+    // EYES
+    float eyeRadiusX = 0.05;
+    float eyeRadiusY = mix(0.05, 0.005, isBlinking);
+    float2 leftEye = float2(-0.15, 0.05);
+    float2 rightEye = float2(0.15, 0.05);
+    float2 leftDelta = centered - leftEye;
+    float2 rightDelta = centered - rightEye;
+
+    float leftEyeShape = step(length(float2(leftDelta.x / eyeRadiusX, leftDelta.y / eyeRadiusY)), 1.0);
+    float rightEyeShape = step(length(float2(rightDelta.x / eyeRadiusX, rightDelta.y / eyeRadiusY)), 1.0);
+    float eyes = leftEyeShape + rightEyeShape;
+
+    // GHOST COLOR
+    float glow = 0.4 + 0.4 * isSpeaking;
+    float3 ghostColor = mix(float3(0.0), float3(0.2 + glow, 1.0, 0.2 + glow), body);
+    if (eyes > 0.0) ghostColor = float3(0.0);
+    float ghostAlpha = max(body, eyes);
+
+    // MIST
+    float2 mistUV = uv * 3.0 + float2(iTime * 0.02, iTime * 0.015);
+    float mistNoise = fbm(mistUV);
+    float pulse = 0.5 + 0.5 * sin(iTime + uv.y * 10.0 + mistNoise * 5.0);
+    float mistAlpha = smoothstep(0.4, 0.6, mistNoise) * pulse * 0.3;
+
+    // GLOW FROM GHOST ON MIST
+    float2 ghostCenter = float2(0.5, 0.5 + floatOffset / 1.2);
+    float glowDist = distance(uv, ghostCenter);
+    float mistGlow = smoothstep(0.25, 0.0, glowDist) * isSpeaking;
+    float3 mistColor = mix(float3(0.85), float3(0.2, 1.0, 0.2), mistGlow);
+
+    float3 finalColor = mistColor * mistAlpha + ghostColor;
+    float finalAlpha = max(ghostAlpha, mistAlpha);
+
+    return half4(finalColor, finalAlpha);
+}
