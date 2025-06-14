@@ -57,19 +57,22 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun setupRecognizer() {
+        Timber.d("CGH: setupRecognizer()")
         recognizerManager = SpeechRecognizerManager(
             context = this,
+            onStart = { viewModel.onUserSpeechStart() },
             onResult = { result ->
-                Timber.d("Heard: $result")
-                // Optionally speak back
-               //  viewModel.speak("You said: $result")
+                viewModel.onUserSpeechEnd(result)
+                Timber.d("CGH: Heard: $result")
             },
             onError = { error ->
-                Timber.e("Speech error: $error")
+                viewModel.onUserSpeechEnd(null)
+                Timber.e("CGH: Speech error: $error")
             }
         )
 
-        recognizerManager?.let { viewModel.setSpeechRecognizer(it) }
+        viewModel.setSpeechRecognizer(recognizerManager!!)
+
     }
 
     override fun onDestroy() {

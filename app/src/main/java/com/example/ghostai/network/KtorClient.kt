@@ -11,6 +11,7 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.logging.*
 import io.ktor.http.*
+import timber.log.Timber
 
 fun ktorHttpClient(): HttpClient {
     return HttpClient(OkHttp) {
@@ -19,11 +20,12 @@ fun ktorHttpClient(): HttpClient {
                 prettyPrint = true
                 isLenient = true
                 ignoreUnknownKeys = true
+                encodeDefaults = true
             })
         }
 
         install(Logging) {
-            logger = Logger.DEFAULT
+            logger = KtorLogger()
             level = LogLevel.BODY
         }
 
@@ -31,6 +33,12 @@ fun ktorHttpClient(): HttpClient {
         defaultRequest {
             contentType(ContentType.Application.Json)
         }
+    }
+}
+
+class KtorLogger() : Logger {
+    override fun log(message: String) {
+        Timber.d(message)
     }
 }
 

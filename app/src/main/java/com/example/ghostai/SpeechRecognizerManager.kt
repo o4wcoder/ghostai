@@ -13,6 +13,7 @@ import java.util.Locale
 
 class SpeechRecognizerManager(
     private val context: Context,
+    private val onStart: () -> Unit,
     private val onResult: (String) -> Unit,
     private val onError: (String) -> Unit
 ) {
@@ -24,12 +25,15 @@ class SpeechRecognizerManager(
     }
 
     init {
+        Timber.d("CGH: SpeechRecognizerManager init")
         recognizer.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) {
-                Timber.d("Ready for speech")
+                Timber.d("CGH: SpeachReconizerManager: onReadyForSpeech()")
             }
 
-            override fun onBeginningOfSpeech() {}
+            override fun onBeginningOfSpeech() {
+                onStart()
+            }
             override fun onRmsChanged(rmsdB: Float) {}
             override fun onBufferReceived(buffer: ByteArray?) {}
             override fun onEndOfSpeech() {}
@@ -50,30 +54,21 @@ class SpeechRecognizerManager(
                     }
                 }
                 onError(message)
-
-                // Restart listening after error
-                recognizer.cancel()
-                restartListening()
             }
 
             override fun onResults(results: Bundle?) {
-                val matches = results
+                val resultText = results
                     ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                     ?.firstOrNull()
-                if (matches != null) onResult(matches)
 
-                restartListening()
+                if (!resultText.isNullOrBlank()) {
+                    onResult(resultText)
+                }
             }
 
             override fun onPartialResults(partialResults: Bundle?) {}
             override fun onEvent(eventType: Int, params: Bundle?) {}
         })
-    }
-
-    private fun restartListening() {
-        Handler(Looper.getMainLooper()).postDelayed({
-            recognizer.startListening(intent)
-        }, 1000)
     }
 
     fun startListening() {

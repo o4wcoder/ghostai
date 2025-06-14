@@ -4,23 +4,35 @@ import android.app.Application
 import android.speech.tts.TextToSpeech
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import dagger.hilt.android.lifecycle.HiltViewModel
+import com.example.ghostai.model.ConversationState
+import com.example.ghostai.service.OpenAIService
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.util.Locale
 import javax.inject.Inject
 
-@HiltViewModel
-class GhostViewModel @Inject constructor(private val application: Application) : AndroidViewModel(application) {
+class GhostViewModel @Inject constructor(private val application: Application) :
+    AndroidViewModel(application) {
+
+
+    private val openAIService = OpenAIService(BuildConfig.OPENAI_API_KEY)
 
     private val tts: TextToSpeech
     private var speechRecognizerManager: SpeechRecognizerManager? = null
-    private val _isSpeaking = MutableStateFlow(false)
-    val isSpeaking: StateFlow<Boolean> = _isSpeaking.asStateFlow()
+
+    private val _conversationState = MutableStateFlow(ConversationState.Idle)
+    val conversationState: StateFlow<ConversationState> = _conversationState.asStateFlow()
+
+    val isSpeaking = conversationState
+        .map { it == ConversationState.GhostTalking }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     init {
         tts = TextToSpeech(application) { status ->
@@ -33,21 +45,48 @@ class GhostViewModel @Inject constructor(private val application: Application) :
 
     fun setSpeechRecognizer(manager: SpeechRecognizerManager) {
         speechRecognizerManager = manager
-        speechRecognizerManager?.startListening()
+        maybeRestartListening()
     }
 
     fun speak(text: String) {
-        if (tts.isSpeaking) return
+        if (_conversationState.value != ConversationState.Idle || tts.isSpeaking) return
 
-                tts.voices.forEach { voice ->
-            Timber.d("Voice: ${voice.name}, Locale: ${voice.locale}, Features: ${voice.features}")
-        }
+        _conversationState.value = ConversationState.GhostTalking
+        speechRecognizerManager?.stopListening()
 
-        _isSpeaking.value = true
         tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "ghost-utterance")
+
         viewModelScope.launch {
             delayWhileSpeaking()
-            _isSpeaking.value = false
+            _conversationState.value = ConversationState.Idle
+            maybeRestartListening()
+        }
+    }
+
+    fun onUserSpeechStart() {
+        Timber.d("CGH: onUserSpeechStart()")
+        if (_conversationState.value == ConversationState.Idle) {
+            _conversationState.value = ConversationState.UserTalking
+        }
+    }
+
+    fun onUserSpeechEnd(result: String?) {
+        if (_conversationState.value == ConversationState.UserTalking) {
+            _conversationState.value = ConversationState.Idle
+            maybeRestartListening()
+        }
+         Timber.d("CGH: onUserSpeechEnd: $result")
+        viewModelScope.launch {
+            result?.let {
+                val reply = openAIService.getGhostReply(result)
+                speak(reply)
+            }
+        }
+    }
+
+    private fun maybeRestartListening() {
+        if (_conversationState.value == ConversationState.Idle) {
+            speechRecognizerManager?.startListening()
         }
     }
 

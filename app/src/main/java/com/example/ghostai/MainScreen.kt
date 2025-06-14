@@ -14,8 +14,6 @@ import com.example.ghostai.ui.theme.GhostAITheme
 fun MainScreen(isSpeaking: Boolean) {
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-//        GhostMistBackground()
-//        FullShaderGhost(isSpeaking = isSpeaking, modifier = Modifier.align(Alignment.Center))
         GhostWithMist(isSpeaking = isSpeaking, modifier = Modifier.align(Alignment.Center))
     }
 }
