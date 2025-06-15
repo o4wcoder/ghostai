@@ -46,8 +46,13 @@ half4 main(float2 fragCoord) {
     float tailFactor = smoothstep(0.0, 0.3, ghostUV.y);
     ghostUV.y += tailWave * tailFactor;
 
+    ghostUV.x *= mix(1.0, 0.4, smoothstep(0.0, 0.6, ghostUV.y));
+
     float radius = 0.4;
-    float ghostBody = smoothstep(radius, radius - 0.1, length(ghostUV));
+    // Stretch ghost vertically
+    float2 ellipticalUV = float2(ghostUV.x, ghostUV.y * 0.9);
+    float ghostBody = smoothstep(radius, radius - 0.1, length(ellipticalUV));
+
     float ghostMask = smoothstep(0.01, 0.99, ghostBody);
 
     // === Blinking logic ===
