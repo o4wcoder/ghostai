@@ -1,14 +1,12 @@
 package com.example.ghostai.service
 
+import com.example.ghostai.BuildConfig
 import com.example.ghostai.network.ktorHttpClient
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.*
-import kotlinx.serialization.json.*
 
 private val LLM_MODEL = "gpt-4o"
 
@@ -38,12 +36,12 @@ data class ChatCompletionResponse(
 
 class OpenAIService(
     private val apiKey: String,
-    private val client: HttpClient = ktorHttpClient() // your shared client
+    private val client: HttpClient = ktorHttpClient()
 ) {
 
     suspend fun getGhostReply(userPrompt: String): String {
         val messages = listOf(
-            ChatMessage("system", "You are a spooky, witty ghost named Whisper who haunts a foggy glade and loves playful banter."),
+            ChatMessage("system", "You are a sarcastic, witty ghost named Whisper who haunts a foggy glade and loves playful banter."),
             ChatMessage("user", userPrompt)
         )
 

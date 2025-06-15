@@ -1,6 +1,8 @@
 package com.example.ghostai.di
 
+import com.example.ghostai.BuildConfig
 import com.example.ghostai.network.ktorHttpClient
+import com.example.ghostai.service.OpenAIService
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -15,4 +17,10 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideHttpClient(): HttpClient = ktorHttpClient()
+
+    @Provides
+    @Singleton
+    fun provideOpenAIService(): OpenAIService {
+        return OpenAIService(BuildConfig.OPENAI_API_KEY, ktorHttpClient())
+    }
 }

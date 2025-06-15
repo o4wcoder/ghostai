@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.ghostai.model.ConversationState
 import com.example.ghostai.service.OpenAIService
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -18,17 +19,17 @@ import timber.log.Timber
 import java.util.Locale
 import javax.inject.Inject
 
-class GhostViewModel @Inject constructor(private val application: Application) :
+@HiltViewModel
+class GhostViewModel @Inject constructor(
+    private val openAIService: OpenAIService,
+    application: Application) :
     AndroidViewModel(application) {
-
-
-    private val openAIService = OpenAIService(BuildConfig.OPENAI_API_KEY)
 
     private val tts: TextToSpeech
     private var speechRecognizerManager: SpeechRecognizerManager? = null
 
     private val _conversationState = MutableStateFlow(ConversationState.Idle)
-    val conversationState: StateFlow<ConversationState> = _conversationState.asStateFlow()
+    private val conversationState: StateFlow<ConversationState> = _conversationState.asStateFlow()
 
     val isSpeaking = conversationState
         .map { it == ConversationState.GhostTalking }
