@@ -42,8 +42,8 @@ half4 main(float2 fragCoord) {
     // === Ghost body shape with tail wave ===
     float2 ghostUV = centered;
     ghostUV.y += floatOffset;
-    float tailWave = 0.05 * sin(ghostUV.x * 12.0 + iTime * 2.0);
-    float tailFactor = smoothstep(0.0, -0.3, ghostUV.y);
+    float tailWave = 0.05 * sin(ghostUV.x * 15.0 + iTime * 2.0);
+    float tailFactor = smoothstep(0.0, 0.3, ghostUV.y);
     ghostUV.y += tailWave * tailFactor;
 
     float radius = 0.4;
@@ -61,8 +61,8 @@ half4 main(float2 fragCoord) {
     // === Eye shape and position ===
     float eyeRadiusX = 0.05;
     float eyeRadiusY = mix(0.05, 0.005, isBlinking);
-    float2 leftEye = float2(-0.15, 0.00);
-    float2 rightEye = float2( 0.15, 0.00);
+    float2 leftEye = float2(-0.15, -0.08);
+    float2 rightEye = float2( 0.15, -0.08);
 
     float2 leftDelta = ghostUV - leftEye;
     float2 rightDelta = ghostUV - rightEye;
@@ -72,7 +72,7 @@ half4 main(float2 fragCoord) {
     float eyes = leftEyeShape + rightEyeShape;
 
     // === Mouth shape ===
-    float baseMouthY = 0.18;
+    float baseMouthY = 0.08;
     float mouthWidth = 0.15;
     float idleMouthHeight = 0.01;
     float talkingMouthHeight = 0.07 * abs(sin(iTime * 6.0));
@@ -114,4 +114,3 @@ half4 main(float2 fragCoord) {
 
     return half4(finalColor, 1.0);
 }
-
