@@ -41,7 +41,7 @@ class OpenAIService(
 
     suspend fun getGhostReply(userPrompt: String): String {
         val messages = listOf(
-            ChatMessage("system", "You are a sarcastic, witty ghost named Whisper who haunts a foggy glade and loves playful banter."),
+            ChatMessage("system", "You are a ghost named Whisper who haunts a foggy glade and is mischievous. Keep your responses brief, spooky, witty, sarcastic — no more than one or two sentences."),
             ChatMessage("user", userPrompt)
         )
 

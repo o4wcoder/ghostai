@@ -5,8 +5,10 @@ import android.speech.tts.TextToSpeech
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.ghostai.model.ConversationState
+import com.example.ghostai.service.ElevenLabsService
 import com.example.ghostai.service.OpenAIService
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -15,6 +17,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.Dispatcher
 import timber.log.Timber
 import java.util.Locale
 import javax.inject.Inject
@@ -22,6 +26,7 @@ import javax.inject.Inject
 @HiltViewModel
 class GhostViewModel @Inject constructor(
     private val openAIService: OpenAIService,
+    private val elevenLabsService: ElevenLabsService,
     application: Application) :
     AndroidViewModel(application) {
 
@@ -39,8 +44,24 @@ class GhostViewModel @Inject constructor(
         tts = TextToSpeech(application) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 tts.language = Locale.US
-                speak("Hello, I am a ghost. I will haunt you forever.")
+              //  speak("Hello, I am a ghost. I will haunt you forever.")
             }
+        }
+
+        viewModelScope.launch {
+//            val freeVoices = elevenLabsService.getAvailableVoices()
+//            freeVoices.forEach {
+//                Timber.d("Free Voice: ${it.name} (${it.voice_id}). Category = ${it.category}")
+//            }
+
+            val audioData =
+                withContext(Dispatchers.IO) {
+                    elevenLabsService.synthesizeSpeech("Hello, I am a ghost. I will haunt you forever.")
+                }
+            withContext(Dispatchers.Main) {
+                elevenLabsService.playAudio(application, audioData)
+            }
+
         }
     }
 
