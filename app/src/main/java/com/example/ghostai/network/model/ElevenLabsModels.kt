@@ -1,6 +1,5 @@
-package com.example.ghostai.network
+package com.example.ghostai.network.model
 
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 

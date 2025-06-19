@@ -5,6 +5,7 @@ import android.speech.tts.TextToSpeech
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.ghostai.model.ConversationState
+import com.example.ghostai.network.model.ElevenLabsSpeechToTextResult
 import com.example.ghostai.service.ElevenLabsService
 import com.example.ghostai.service.OpenAIService
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -27,7 +28,8 @@ import javax.inject.Inject
 class GhostViewModel @Inject constructor(
     private val openAIService: OpenAIService,
     private val elevenLabsService: ElevenLabsService,
-    application: Application) :
+    private val application: Application
+) :
     AndroidViewModel(application) {
 
     private val tts: TextToSpeech
@@ -44,24 +46,24 @@ class GhostViewModel @Inject constructor(
         tts = TextToSpeech(application) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 tts.language = Locale.US
-              //  speak("Hello, I am a ghost. I will haunt you forever.")
+                //  speak("Hello, I am a ghost. I will haunt you forever.")
             }
         }
+    }
 
+    fun speakWithCustomVoice(text: String) {
         viewModelScope.launch {
-//            val freeVoices = elevenLabsService.getAvailableVoices()
-//            freeVoices.forEach {
-//                Timber.d("Free Voice: ${it.name} (${it.voice_id}). Category = ${it.category}")
-//            }
-
-            val audioData =
+            val audioDataResult =
                 withContext(Dispatchers.IO) {
-                    elevenLabsService.synthesizeSpeech("Hello, I am a ghost. I will haunt you forever.")
+                    elevenLabsService.synthesizeSpeech(text)
                 }
-            withContext(Dispatchers.Main) {
-                elevenLabsService.playAudio(application, audioData)
+            if (audioDataResult is ElevenLabsSpeechToTextResult.Success) {
+                withContext(Dispatchers.Main) {
+                    elevenLabsService.playAudio(application, audioDataResult.audioData)
+                }
+            } else {
+                Timber.e("ElevenLabsTTS failed: $audioDataResult")
             }
-
         }
     }
 
@@ -97,11 +99,12 @@ class GhostViewModel @Inject constructor(
             _conversationState.value = ConversationState.Idle
             maybeRestartListening()
         }
-         Timber.d("CGH: onUserSpeechEnd: $result")
+        Timber.d("CGH: onUserSpeechEnd: $result")
         viewModelScope.launch {
             result?.let {
                 val reply = openAIService.getGhostReply(result)
-                speak(reply)
+                //  speak(reply)
+                speakWithCustomVoice(reply)
             }
         }
     }
