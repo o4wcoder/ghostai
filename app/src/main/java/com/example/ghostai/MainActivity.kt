@@ -3,6 +3,7 @@ package com.example.ghostai
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.speech.SpeechRecognizer
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -62,9 +63,13 @@ class MainActivity : ComponentActivity() {
                 viewModel.onUserSpeechEnd(result)
                 Timber.d("CGH: Heard: $result")
             },
-            onError = { error ->
+            onError = { error, message ->
                 viewModel.onUserSpeechEnd(null)
-                Timber.e("CGH: Speech error: $error")
+                Timber.e("CGH: Speech error: $message")
+
+                if (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
+                    viewModel.restartRecognizerWithDelay()
+                }
             }
         )
 

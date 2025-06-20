@@ -58,7 +58,7 @@ class ElevenLabsService(
     }
 
     suspend fun synthesizeSpeech(text: String): ElevenLabsSpeechToTextResult {
-        val url = "$ELEVEN_LABS_API_BASE/text-to-speech/XB0fDUnXU5powFXDhCwa"
+        val url = "$ELEVEN_LABS_API_BASE/text-to-speech/$CHAROLETTE_VOICE_ID"
 
         return try {
             val response: HttpResponse = client.post(url) {
@@ -91,26 +91,30 @@ class ElevenLabsService(
         }
     }
 
-    fun playAudio(context: Context, audioData: ByteArray) {
+    fun playAudio(context: Context, audioData: ByteArray, onComplete: () -> Unit = {}, onError: (Exception) -> Unit = {}) {
         try {
             val tempFile = File.createTempFile("tts_audio", ".mp3", context.cacheDir).apply {
                 writeBytes(audioData)
                 deleteOnExit()
             }
 
-            mediaPlayer?.release()
+            mediaPlayer?.release() // Clean up previous MediaPlayer instance
             mediaPlayer = MediaPlayer().apply {
                 setDataSource(tempFile.absolutePath)
+                setOnPreparedListener { start() }
                 setOnCompletionListener {
-                    Timber.d("Audio playback completed")
                     release()
-                    mediaPlayer = null
+                    onComplete()
                 }
-                prepare()
-                start()
+                setOnErrorListener { _, what, extra ->
+                    release()
+                    onError(Exception("MediaPlayer error: what=$what, extra=$extra"))
+                    true // indicates we handled it
+                }
+                prepareAsync()
             }
-        } catch (e: IOException) {
-            Timber.e(e, "Failed to play audio")
+        } catch (e: Exception) {
+            onError(e)
         }
     }
 }

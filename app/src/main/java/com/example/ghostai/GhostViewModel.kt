@@ -59,10 +59,23 @@ class GhostViewModel @Inject constructor(
                 }
             if (audioDataResult is ElevenLabsSpeechToTextResult.Success) {
                 withContext(Dispatchers.Main) {
-                    elevenLabsService.playAudio(application, audioDataResult.audioData)
+                    // Indicate that the ghost is speaking (triggers mouth animation)
+                    _conversationState.value = ConversationState.GhostTalking
+
+                    elevenLabsService.playAudio(application, audioDataResult.audioData,
+                        onComplete = {
+                            // Ghost is done speaking
+                            _conversationState.value = ConversationState.Idle
+                        },
+                        onError = {
+                            Timber.e("Error during playback: $it")
+                            _conversationState.value = ConversationState.Idle
+                        }
+                    )
                 }
             } else {
-                Timber.e("ElevenLabsTTS failed: $audioDataResult")
+                Timber.e("Failed to synthesize voice: ${(audioDataResult as ElevenLabsSpeechToTextResult.Failure).errorMessage}")
+                _conversationState.value = ConversationState.Idle
             }
         }
     }
@@ -108,6 +121,16 @@ class GhostViewModel @Inject constructor(
             }
         }
     }
+
+    fun restartRecognizerWithDelay() {
+        viewModelScope.launch {
+            delay(500)
+            speechRecognizerManager?.stopListening()
+            delay(100)
+            speechRecognizerManager?.startListening()
+        }
+    }
+
 
     private fun maybeRestartListening() {
         if (_conversationState.value == ConversationState.Idle) {

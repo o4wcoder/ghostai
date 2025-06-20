@@ -15,7 +15,7 @@ class SpeechRecognizerManager(
     private val context: Context,
     private val onStart: () -> Unit,
     private val onResult: (String) -> Unit,
-    private val onError: (String) -> Unit
+    private val onError: (Int, String) -> Unit
 ) {
 
     private val recognizer = SpeechRecognizer.createSpeechRecognizer(context)
@@ -53,7 +53,7 @@ class SpeechRecognizerManager(
                         "Unknown error code: $error"
                     }
                 }
-                onError(message)
+                onError(error,message)
             }
 
             override fun onResults(results: Bundle?) {
