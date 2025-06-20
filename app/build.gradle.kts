@@ -14,6 +14,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.spotless)
     id("kotlin-kapt")
 }
 
@@ -57,6 +58,7 @@ android {
     }
 }
 
+
 dependencies {
 
     implementation(libs.androidx.core.ktx)
@@ -85,3 +87,16 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 }
+
+spotless {
+    kotlin {
+        target("**/*.kt")
+        ktlint("1.2.1")
+    }
+
+    kotlinGradle {
+        target("**/*.gradle.kts")
+        ktlint()
+    }
+}
+

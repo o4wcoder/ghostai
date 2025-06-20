@@ -14,7 +14,6 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
-
     @Provides
     @Singleton
     fun provideHttpClient(): HttpClient = ktorHttpClient()
@@ -29,6 +28,5 @@ object NetworkModule {
     @Singleton
     fun provideElevenLabsService(): ElevenLabsService {
         return ElevenLabsService(BuildConfig.ELEVEN_LABS_API_KEY, ktorHttpClient())
-
     }
 }

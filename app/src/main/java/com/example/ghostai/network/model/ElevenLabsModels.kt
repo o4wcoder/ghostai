@@ -5,7 +5,7 @@ import kotlinx.serialization.json.JsonElement
 
 @Serializable
 data class VoicesResponse(
-    val voices: List<Voice>
+    val voices: List<Voice>,
 )
 
 @Serializable
@@ -14,5 +14,5 @@ data class Voice(
     val name: String,
     val category: String,
     val labels: Map<String, String>? = null,
-    val samples: JsonElement? = null
+    val samples: JsonElement? = null,
 )
