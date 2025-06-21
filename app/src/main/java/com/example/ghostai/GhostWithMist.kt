@@ -42,7 +42,6 @@ fun GhostWithMist(isSpeaking: Boolean,
             float gradient;
         };
 
-
         float hash(float2 p) {
             return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453123);
         }
@@ -145,6 +144,17 @@ fun GhostWithMist(isSpeaking: Boolean,
             return step(0.0, timeSinceBlink) * step(timeSinceBlink, blinkDuration);
         }
 
+        vec2 randomPupilOffset(float baseTime) {
+            float2 randVec = vec2(
+                fract(sin(baseTime * 12.9898) * 43758.5453),
+                fract(sin(baseTime * 78.233) * 96321.5487)
+            );
+            float angle = randVec.x * 6.2831; // 2π
+            float radius = 0.004 + 0.006 * randVec.y; // small range
+            return vec2(cos(angle), sin(angle)) * radius;
+        }
+
+
         half4 main(float2 fragCoord) {
             float2 uv = fragCoord / iResolution;
             float2 centered = (fragCoord - 0.5 * iResolution) / min(iResolution.x, iResolution.y);
@@ -172,6 +182,13 @@ fun GhostWithMist(isSpeaking: Boolean,
             // === Blinking logic ===
             float isBlinking = isBlinking(iTime);
 
+            // === Pupil Movement Logic ===
+            float moveCycle = floor(iTime / 3.0); // change every 3 seconds
+            float cycleTime = fract(iTime / 3.0); // 0 → 1 within cycle
+            float moveProgress = smoothstep(0.0, 0.2, cycleTime) * (1.0 - smoothstep(0.8, 1.0, cycleTime)); // ease in/out
+
+            vec2 pupilOffset = randomPupilOffset(moveCycle) * moveProgress * (1.0 - isBlinking);
+
             // === Eye shape and position ===
             float2 leftEye = float2(-0.15, -0.08);
             float2 rightEye = float2( 0.15, -0.08);
@@ -179,7 +196,7 @@ fun GhostWithMist(isSpeaking: Boolean,
             EyeData eyes = drawEyes(ghostUV, leftEye, rightEye, isBlinking);
 
             // === Pupils ===
-             PupilData pupils = drawPupils(ghostUV, leftEye, rightEye, isBlinking);
+             PupilData pupils = drawPupils(ghostUV, leftEye + pupilOffset, rightEye + pupilOffset, isBlinking);
 
             // === Mouth ===
              float mouth = drawMouth(ghostUV, iTime, isSpeaking);
@@ -273,7 +290,7 @@ fun GhostWithMist(isSpeaking: Boolean,
 @Composable
 fun GhostWithMistPreview() {
     GhostAITheme {
-        GhostWithMist(isSpeaking = false, time = 1.0F, modifier = Modifier.background(Color.Black))
+        GhostWithMist(isSpeaking = true, time = 2.0F, modifier = Modifier.background(Color.Black))
     }
 }
 
