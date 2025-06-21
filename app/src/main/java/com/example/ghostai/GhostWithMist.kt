@@ -42,6 +42,12 @@ fun GhostWithMist(isSpeaking: Boolean,
             float gradient;
         };
 
+        struct MouthData {
+            float mask;
+            float gradient;
+        };
+
+
         float hash(float2 p) {
             return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453123);
         }
@@ -124,7 +130,7 @@ fun GhostWithMist(isSpeaking: Boolean,
             return result;
         }
 
-        float drawMouth(vec2 ghostUV, float iTime, float isSpeaking) {
+        MouthData drawMouth(vec2 ghostUV, float iTime, float isSpeaking) {
            float baseMouthY = 0.08;
             float mouthWidth = 0.15;
             float idleMouthHeight = 0.01;
@@ -132,7 +138,14 @@ fun GhostWithMist(isSpeaking: Boolean,
             float mouthHeight = mix(idleMouthHeight, talkingMouthHeight, isSpeaking);
 
             float2 mouthDelta = ghostUV - float2(0.0, baseMouthY);
-            return step(length(float2(mouthDelta.x / mouthWidth, mouthDelta.y / mouthHeight)), 1.0);
+            float mouthMask = step(length(float2(mouthDelta.x / mouthWidth, mouthDelta.y / mouthHeight)), 1.0);
+
+            float mouthGradient = smoothstep(0.0, 1.0, length(float2(mouthDelta.x / mouthWidth, mouthDelta.y / mouthHeight)));
+
+            MouthData result;
+            result.mask = mouthMask;
+            result.gradient = mouthGradient;
+            return result;
         }
 
         float isBlinking(float iTime) {
@@ -199,7 +212,7 @@ fun GhostWithMist(isSpeaking: Boolean,
              PupilData pupils = drawPupils(ghostUV, leftEye + pupilOffset, rightEye + pupilOffset, isBlinking);
 
             // === Mouth ===
-             float mouth = drawMouth(ghostUV, iTime, isSpeaking);
+             MouthData mouth = drawMouth(ghostUV, iTime, isSpeaking);
 
             // === Mist background using fbm noise ===
             float2 mistUV = uv * 3.0 + float2(iTime * 0.08, iTime * 0.03);
@@ -246,8 +259,11 @@ fun GhostWithMist(isSpeaking: Boolean,
             float alphaFade = smoothstep(radius, radius - 0.05, length(ellipticalUV));
             float finalAlpha = mix(1.0, ghostMask * alphaFade, ghostMask);
 
-            if (mouth > 0.0) {
-                finalColor = mix(finalColor, float3(0.0), mouth);
+            if (mouth.mask > 0.0) {
+                float3 mouthOuterColor = float3(0.2, 0.3, 0.2);
+                float3 mouthInnerColor = float3(0.0);
+                float3 mouthColor = mix(mouthInnerColor, mouthOuterColor, mouth.gradient);
+                finalColor = mix(finalColor, mouthColor, mouth.mask);
             }
 
             return half4(finalColor, finalAlpha);
