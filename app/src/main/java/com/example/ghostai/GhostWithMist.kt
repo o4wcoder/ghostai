@@ -22,7 +22,9 @@ import com.example.ghostai.ui.theme.GhostAITheme
 import org.intellij.lang.annotations.Language
 
 @Composable
-fun GhostWithMist(isSpeaking: Boolean, modifier: Modifier = Modifier) {
+fun GhostWithMist(isSpeaking: Boolean,
+                  modifier: Modifier = Modifier,
+                  time: Float = rememberStableTime()) {
 
     @Language("AGSL")
     val ghostShader = """
@@ -59,6 +61,48 @@ fun GhostWithMist(isSpeaking: Boolean, modifier: Modifier = Modifier) {
             return v;
         }
 
+        float drawEyes(vec2 ghostUV, float2 leftEye, float2 rightEye, float isBlinking) {
+            float eyeRadiusX = 0.05;
+            float eyeRadiusY = mix(0.05, 0.005, isBlinking);
+
+            float2 leftDelta = ghostUV - leftEye;
+            float2 rightDelta = ghostUV - rightEye;
+
+            float leftEyeShape = step(length(float2(leftDelta.x / eyeRadiusX, leftDelta.y / eyeRadiusY)), 1.0);
+            float rightEyeShape = step(length(float2(rightDelta.x / eyeRadiusX, rightDelta.y / eyeRadiusY)), 1.0);
+            return leftEyeShape + rightEyeShape;
+        }
+
+        float drawPupils(vec2 ghostUV, vec2 leftEye, vec2 rightEye, float isBlinking) {
+          float pupilRadius = 0.015;
+            float2 leftPupilDelta = ghostUV - leftEye;
+            float2 rightPupilDelta = ghostUV - rightEye;
+
+            float leftPupil = step(length(leftPupilDelta), pupilRadius);
+            float rightPupil = step(length(rightPupilDelta), pupilRadius);
+            return (leftPupil + rightPupil) * (1.0 - isBlinking);
+        }
+
+        float drawMouth(vec2 ghostUV, float iTime, float isSpeaking) {
+           float baseMouthY = 0.08;
+            float mouthWidth = 0.15;
+            float idleMouthHeight = 0.01;
+            float talkingMouthHeight = 0.07 * abs(sin(iTime * 6.0));
+            float mouthHeight = mix(idleMouthHeight, talkingMouthHeight, isSpeaking);
+
+            float2 mouthDelta = ghostUV - float2(0.0, baseMouthY);
+            return step(length(float2(mouthDelta.x / mouthWidth, mouthDelta.y / mouthHeight)), 1.0);
+        }
+
+        float isBlinking(float iTime) {
+            float blinkSeed = floor(iTime / 6.0);
+            float rand = fract(sin(blinkSeed * 91.345) * 47453.25);
+            float nextBlinkTime = blinkSeed * 6.0 + rand * 3.0;
+            float blinkDuration = 0.15;
+            float timeSinceBlink = iTime - nextBlinkTime;
+            return step(0.0, timeSinceBlink) * step(timeSinceBlink, blinkDuration);
+        }
+
         half4 main(float2 fragCoord) {
             float2 uv = fragCoord / iResolution;
             float2 centered = (fragCoord - 0.5 * iResolution) / min(iResolution.x, iResolution.y);
@@ -84,45 +128,18 @@ fun GhostWithMist(isSpeaking: Boolean, modifier: Modifier = Modifier) {
             float ghostMask = smoothstep(0.01, 0.99, ghostBody);
 
             // === Blinking logic ===
-            float blinkSeed = floor(iTime / 6.0);
-            float rand = fract(sin(blinkSeed * 91.345) * 47453.25);
-            float nextBlinkTime = blinkSeed * 6.0 + rand * 3.0;
-            float blinkDuration = 0.15;
-            float timeSinceBlink = iTime - nextBlinkTime;
-            float isBlinking = step(0.0, timeSinceBlink) * step(timeSinceBlink, blinkDuration);
+            float isBlinking = isBlinking(iTime);
 
             // === Eye shape and position ===
-            float eyeRadiusX = 0.05;
-            float eyeRadiusY = mix(0.05, 0.005, isBlinking);
             float2 leftEye = float2(-0.15, -0.08);
             float2 rightEye = float2( 0.15, -0.08);
+            float eyes = drawEyes(ghostUV, leftEye, rightEye, isBlinking);
 
-            float2 leftDelta = ghostUV - leftEye;
-            float2 rightDelta = ghostUV - rightEye;
-
-            float leftEyeShape = step(length(float2(leftDelta.x / eyeRadiusX, leftDelta.y / eyeRadiusY)), 1.0);
-            float rightEyeShape = step(length(float2(rightDelta.x / eyeRadiusX, rightDelta.y / eyeRadiusY)), 1.0);
-            float eyes = leftEyeShape + rightEyeShape;
-            
             // === Pupils ===
-            float pupilRadius = 0.015;
-            float2 leftPupilDelta = ghostUV - leftEye;
-            float2 rightPupilDelta = ghostUV - rightEye;
+             float pupils = drawPupils(ghostUV, leftEye, rightEye, isBlinking);
 
-            float leftPupil = step(length(leftPupilDelta), pupilRadius);
-            float rightPupil = step(length(rightPupilDelta), pupilRadius);
-            float pupils = (leftPupil + rightPupil) * (1.0 - isBlinking);
-
-
-            // === Mouth shape ===
-            float baseMouthY = 0.08;
-            float mouthWidth = 0.15;
-            float idleMouthHeight = 0.01;
-            float talkingMouthHeight = 0.07 * abs(sin(iTime * 6.0));
-            float mouthHeight = mix(idleMouthHeight, talkingMouthHeight, isSpeaking);
-
-            float2 mouthDelta = ghostUV - float2(0.0, baseMouthY);
-            float mouthShape = step(length(float2(mouthDelta.x / mouthWidth, mouthDelta.y / mouthHeight)), 1.0);
+            // === Mouth ===
+             float mouth = drawMouth(ghostUV, iTime, isSpeaking);
 
             // === Mist background using fbm noise ===
             float2 mistUV = uv * 3.0 + float2(iTime * 0.08, iTime * 0.03);
@@ -160,8 +177,8 @@ fun GhostWithMist(isSpeaking: Boolean, modifier: Modifier = Modifier) {
             float alphaFade = smoothstep(radius, radius - 0.05, length(ellipticalUV));
             float finalAlpha = mix(1.0, ghostMask * alphaFade, ghostMask);
 
-            if (mouthShape > 0.0) {
-                finalColor = mix(finalColor, float3(0.0), mouthShape);
+            if (mouth > 0.0) {
+                finalColor = mix(finalColor, float3(0.0), mouth);
             }
 
             return half4(finalColor, finalAlpha);
@@ -179,7 +196,6 @@ fun GhostWithMist(isSpeaking: Boolean, modifier: Modifier = Modifier) {
     }
 
     var canvasSize by remember { mutableStateOf(Size(1f, 1f)) }
-    val time = rememberStableTime()
 
     LaunchedEffect(time, isSpeaking, canvasSize) {
         shader.setFloatUniform("iTime", time)
@@ -205,7 +221,7 @@ fun GhostWithMist(isSpeaking: Boolean, modifier: Modifier = Modifier) {
 @Composable
 fun GhostWithMistPreview() {
     GhostAITheme {
-        GhostWithMist(isSpeaking = false, modifier = Modifier.background(Color.Black))
+        GhostWithMist(isSpeaking = false, time = 1.0F, modifier = Modifier.background(Color.Black))
     }
 }
 
