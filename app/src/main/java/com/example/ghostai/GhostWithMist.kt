@@ -32,6 +32,11 @@ fun GhostWithMist(isSpeaking: Boolean,
         uniform float iTime;
         uniform float isSpeaking;
 
+        struct EyeData {
+            float mask;
+            float gradient;
+        };
+
         float hash(float2 p) {
             return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453123);
         }
@@ -61,16 +66,33 @@ fun GhostWithMist(isSpeaking: Boolean,
             return v;
         }
 
-        float drawEyes(vec2 ghostUV, float2 leftEye, float2 rightEye, float isBlinking) {
+        EyeData drawEyes(vec2 ghostUV, vec2 leftEye, vec2 rightEye, float isBlinking) {
             float eyeRadiusX = 0.05;
             float eyeRadiusY = mix(0.05, 0.005, isBlinking);
-
             float2 leftDelta = ghostUV - leftEye;
             float2 rightDelta = ghostUV - rightEye;
 
-            float leftEyeShape = step(length(float2(leftDelta.x / eyeRadiusX, leftDelta.y / eyeRadiusY)), 1.0);
-            float rightEyeShape = step(length(float2(rightDelta.x / eyeRadiusX, rightDelta.y / eyeRadiusY)), 1.0);
-            return leftEyeShape + rightEyeShape;
+            float2 leftNorm = float2(leftDelta.x / eyeRadiusX, leftDelta.y / eyeRadiusY);
+            float2 rightNorm = float2(rightDelta.x / eyeRadiusX, rightDelta.y / eyeRadiusY);
+
+            float leftDist = length(leftNorm);
+            float rightDist = length(rightNorm);
+
+            float leftEyeShape = step(leftDist, 1.0);
+            float rightEyeShape = step(rightDist, 1.0);
+
+            float eyeMask = leftEyeShape + rightEyeShape;
+
+            // Create gradient: 0 (center) to 1 (edge)
+            float leftGradient = smoothstep(0.0, 1.0, leftDist) * leftEyeShape;
+            float rightGradient = smoothstep(0.0, 1.0, rightDist) * rightEyeShape;
+
+            float eyeGradient = max(leftGradient, rightGradient); // max keeps only strongest contribution
+
+            EyeData result;
+            result.mask = eyeMask;
+            result.gradient = eyeGradient;
+            return result;
         }
 
         float drawPupils(vec2 ghostUV, vec2 leftEye, vec2 rightEye, float isBlinking) {
@@ -133,7 +155,8 @@ fun GhostWithMist(isSpeaking: Boolean,
             // === Eye shape and position ===
             float2 leftEye = float2(-0.15, -0.08);
             float2 rightEye = float2( 0.15, -0.08);
-            float eyes = drawEyes(ghostUV, leftEye, rightEye, isBlinking);
+            //float eyes = drawEyes(ghostUV, leftEye, rightEye, isBlinking);
+            EyeData eyes = drawEyes(ghostUV, leftEye, rightEye, isBlinking);
 
             // === Pupils ===
              float pupils = drawPupils(ghostUV, leftEye, rightEye, isBlinking);
@@ -165,8 +188,14 @@ fun GhostWithMist(isSpeaking: Boolean,
             // === Composite ghost over mist ===
             float3 finalColor = mix(mistColor, ghostShadedColor, ghostMask);
 
-            if (eyes > 0.0) {
-                finalColor = mix(finalColor, float3(0.0), eyes);
+            if (eyes.mask > 0.0) {
+                // Brighter edge for more contrast — like a recessed socket
+                float3 eyeOuterColor = float3(0.20, 0.3, 0.20); // shadowy green-gray
+                float3 eyeInnerColor = float3(0.0);   // black center
+
+                float3 eyeGradientColor = mix(eyeInnerColor, eyeOuterColor, eyes.gradient);
+                finalColor = mix(finalColor, eyeGradientColor, eyes.mask);
+
             }
             if (pupils > 0.0) {
                 float3 pupilGlowColor = float3(0.3, 1.0, 0.3);
