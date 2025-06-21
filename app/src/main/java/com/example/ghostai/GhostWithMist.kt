@@ -37,6 +37,12 @@ fun GhostWithMist(isSpeaking: Boolean,
             float gradient;
         };
 
+        struct PupilData {
+            float mask;
+            float gradient;
+        };
+
+
         float hash(float2 p) {
             return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453123);
         }
@@ -95,14 +101,28 @@ fun GhostWithMist(isSpeaking: Boolean,
             return result;
         }
 
-        float drawPupils(vec2 ghostUV, vec2 leftEye, vec2 rightEye, float isBlinking) {
-          float pupilRadius = 0.015;
-            float2 leftPupilDelta = ghostUV - leftEye;
-            float2 rightPupilDelta = ghostUV - rightEye;
+        PupilData drawPupils(vec2 ghostUV, vec2 leftEye, vec2 rightEye, float isBlinking) {
+            float pupilRadius = 0.015;
 
-            float leftPupil = step(length(leftPupilDelta), pupilRadius);
-            float rightPupil = step(length(rightPupilDelta), pupilRadius);
-            return (leftPupil + rightPupil) * (1.0 - isBlinking);
+            float2 leftDelta = ghostUV - leftEye;
+            float2 rightDelta = ghostUV - rightEye;
+
+            float leftDist = length(leftDelta);
+            float rightDist = length(rightDelta);
+
+            float leftMask = step(leftDist, pupilRadius);
+            float rightMask = step(rightDist, pupilRadius);
+
+            float leftGradient = 1.0 - smoothstep(0.0, pupilRadius, leftDist);
+            float rightGradient = 1.0 - smoothstep(0.0, pupilRadius, rightDist);
+
+            float combinedMask = (leftMask + rightMask) * (1.0 - isBlinking);
+            float combinedGradient = max(leftGradient * leftMask, rightGradient * rightMask);
+
+            PupilData result;
+            result.mask = combinedMask;
+            result.gradient = combinedGradient;
+            return result;
         }
 
         float drawMouth(vec2 ghostUV, float iTime, float isSpeaking) {
@@ -159,7 +179,7 @@ fun GhostWithMist(isSpeaking: Boolean,
             EyeData eyes = drawEyes(ghostUV, leftEye, rightEye, isBlinking);
 
             // === Pupils ===
-             float pupils = drawPupils(ghostUV, leftEye, rightEye, isBlinking);
+             PupilData pupils = drawPupils(ghostUV, leftEye, rightEye, isBlinking);
 
             // === Mouth ===
              float mouth = drawMouth(ghostUV, iTime, isSpeaking);
@@ -195,13 +215,16 @@ fun GhostWithMist(isSpeaking: Boolean,
 
                 float3 eyeGradientColor = mix(eyeInnerColor, eyeOuterColor, eyes.gradient);
                 finalColor = mix(finalColor, eyeGradientColor, eyes.mask);
+            }
 
-            }
-            if (pupils > 0.0) {
-                float3 pupilGlowColor = float3(0.3, 1.0, 0.3);
-                finalColor = mix(finalColor, pupilGlowColor, pupils * 0.6);
-            }
-            
+           if (pupils.mask > 0.0) {
+               float3 pupilOuterColor = float3(0.063, 0.302, 0.063);
+               float3 pupilCenterColor = float3(0.6, 0.9, 0.6);
+
+               float3 pupilColor = mix(pupilOuterColor, pupilCenterColor, pupils.gradient);
+               finalColor = mix(finalColor, pupilColor, pupils.mask);
+           }
+
             // === Alpha fade at ghost edges ===
             float alphaFade = smoothstep(radius, radius - 0.05, length(ellipticalUV));
             float finalAlpha = mix(1.0, ghostMask * alphaFade, ghostMask);
