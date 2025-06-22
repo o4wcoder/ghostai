@@ -80,21 +80,6 @@ class GhostViewModel @Inject constructor(
         maybeRestartListening()
     }
 
-    fun speak(text: String) {
-        if (_conversationState.value != ConversationState.Idle || tts.isSpeaking) return
-
-        _conversationState.value = ConversationState.GhostTalking
-        speechRecognizerManager?.stopListening()
-
-        tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "ghost-utterance")
-
-        viewModelScope.launch {
-            delayWhileSpeaking()
-            _conversationState.value = ConversationState.Idle
-            maybeRestartListening()
-        }
-    }
-
     fun onUserSpeechStart() {
         Timber.d("CGH: onUserSpeechStart()")
         if (_conversationState.value == ConversationState.Idle) {
@@ -103,20 +88,22 @@ class GhostViewModel @Inject constructor(
     }
 
     fun onUserSpeechEnd(result: String?) {
+        if (_conversationState.value == ConversationState.UserTalking) {
             _conversationState.value = ConversationState.Idle
             maybeRestartListening()
+        }
 
         Timber.d("CGH: onUserSpeechEnd: $result")
-        if(!result.isNullOrBlank()) {
+        if (!result.isNullOrBlank()) {
             viewModelScope.launch {
-                    val openAiResponse = async { openAIService.getGhostReply(result) }
+                val openAiResponse = async { openAIService.getGhostReply(result) }
 
-                    val elevenLabsAudio = async {
-                        val text = openAiResponse.await()
-                        elevenLabsService.synthesizeSpeech(text)
-                    }
+                val elevenLabsAudio = async {
+                    val text = openAiResponse.await()
+                    elevenLabsService.synthesizeSpeech(text)
+                }
 
-                    speakWithCustomVoice(elevenLabsAudio.await())
+                speakWithCustomVoice(elevenLabsAudio.await())
             }
         }
     }

@@ -30,31 +30,13 @@ import java.io.File
 private const val ELEVEN_LABS_API_BASE = "https://api.elevenlabs.io/v1"
 
 private const val CHAROLETTE_VOICE_ID = "XB0fDUnXU5powFXDhCwa"
+private const val DEMON_MONSTER_VOICE_ID = "vfaqCOvlrKi4Zp7C2IAm"
 
 class ElevenLabsService(
     private val apiKey: String,
     private val client: HttpClient = ktorHttpClient(),
 ) {
     private var mediaPlayer: MediaPlayer? = null
-
-    suspend fun getAvailableVoices(): List<Voice> {
-        val response: HttpResponse =
-            client.get("$ELEVEN_LABS_API_BASE/voices") {
-                headers {
-                    append("xi-api-key", apiKey)
-                }
-            }
-
-        val json = response.bodyAsText()
-
-        val jsonParser =
-            Json {
-                ignoreUnknownKeys = true
-                isLenient = true
-            }
-        val parsed = jsonParser.decodeFromString<VoicesResponse>(json)
-        return parsed.voices
-    }
 
     suspend fun synthesizeSpeech(text: String): ElevenLabsSpeechToTextResult {
         val url = "$ELEVEN_LABS_API_BASE/text-to-speech/$CHAROLETTE_VOICE_ID"

@@ -23,11 +23,11 @@ class SpeechRecognizerManager(
         }
 
     init {
-        Timber.d("CGH: SpeechRecognizerManager init")
+        Timber.d("SpeechRecognizerManager init")
         recognizer.setRecognitionListener(
             object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) {
-                    Timber.d("CGH: SpeachReconizerManager: onReadyForSpeech()")
+                    Timber.d("SpeachReconizerManager: onReadyForSpeech()")
                 }
 
                 override fun onBeginningOfSpeech() {
