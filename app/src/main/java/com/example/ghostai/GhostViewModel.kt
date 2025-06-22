@@ -83,7 +83,7 @@ class GhostViewModel @Inject constructor(
     }
 
     fun onUserSpeechStart() {
-        Timber.d("CGH: onUserSpeechStart()")
+        Timber.d("CGH: onUserSpeechStart() with state: ${_conversationState.value}")
         if (_conversationState.value == ConversationState.Idle) {
             _conversationState.value = ConversationState.UserTalking
         }
