@@ -1,6 +1,8 @@
 package com.example.ghostai
 
 import android.graphics.RuntimeShader
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
@@ -77,11 +79,11 @@ fun GhostWithMist(isSpeaking: Boolean,
             return v;
         }
 
-        EyeData drawEyes(vec2 ghostUV, vec2 leftEye, vec2 rightEye, float isBlinking) {
+        EyeData drawEyes(vec2 uv, vec2 leftEye, vec2 rightEye, float isBlinking) {
             float eyeRadiusX = 0.05;
             float eyeRadiusY = mix(0.05, 0.005, isBlinking);
-            float2 leftDelta = ghostUV - leftEye;
-            float2 rightDelta = ghostUV - rightEye;
+            float2 leftDelta = uv - leftEye;
+            float2 rightDelta = uv - rightEye;
 
             float2 leftNorm = float2(leftDelta.x / eyeRadiusX, leftDelta.y / eyeRadiusY);
             float2 rightNorm = float2(rightDelta.x / eyeRadiusX, rightDelta.y / eyeRadiusY);
@@ -106,11 +108,11 @@ fun GhostWithMist(isSpeaking: Boolean,
             return result;
         }
 
-        PupilData drawPupils(vec2 ghostUV, vec2 leftEye, vec2 rightEye, float isBlinking) {
+        PupilData drawPupils(vec2 uv, vec2 leftEye, vec2 rightEye, float isBlinking) {
             float pupilRadius = 0.015;
 
-            float2 leftDelta = ghostUV - leftEye;
-            float2 rightDelta = ghostUV - rightEye;
+            float2 leftDelta = uv - leftEye;
+            float2 rightDelta = uv - rightEye;
 
             float leftDist = length(leftDelta);
             float rightDist = length(rightDelta);
@@ -130,15 +132,33 @@ fun GhostWithMist(isSpeaking: Boolean,
             return result;
         }
 
-        MouthData drawMouth(vec2 ghostUV, float iTime, float isSpeaking) {
-           float baseMouthY = 0.08;
+        MouthData drawMouth(vec2 uv, float iTime, float isSpeaking) {
+            float baseMouthY = 0.08;
             float mouthWidth = 0.15;
-            float idleMouthHeight = 0.01;
-            float talkingMouthHeight = 0.07 * abs(sin(iTime * 6.0));
-            float mouthHeight = mix(idleMouthHeight, talkingMouthHeight, isSpeaking);
 
-            float2 mouthDelta = ghostUV - float2(0.0, baseMouthY);
-            float mouthMask = step(length(float2(mouthDelta.x / mouthWidth, mouthDelta.y / mouthHeight)), 1.0);
+            float baseMouthHeight = 0.01;
+
+            // Idle "breathing" motion — slow and subtle
+            float idleWiggle = 0.005 * sin(iTime * 1.5);
+
+            // Use cycle-based random height variation
+            float mouthCycle = floor(iTime * 2.0); // every 0.5 seconds
+            float randHeight = 0.6 + 0.4 * fract(sin(mouthCycle * 17.0) * 43758.5453); // random between 0.6–1.0
+            float speakingAmplitude = randHeight * abs(sin(iTime * 6.0));
+            float talkingHeight = 0.05 * speakingAmplitude;
+
+            // Combine them
+            float mouthHeight = baseMouthHeight + idleWiggle * (1.0 - isSpeaking) + talkingHeight * isSpeaking;
+
+            float mouthWiggle = 0.01 * sin(iTime * 1.0) * (1.0 - isSpeaking);
+            float2 mouthDelta = uv - float2(mouthWiggle, baseMouthY);
+
+            // Distort the sides of the mouth
+            float phase = isSpeaking > 0.0 ? iTime * 5.0 : 0.0;
+            float mouthShapeWarp = 1.0 + 0.1 * sin(mouthDelta.x * 8.0 + iTime * 2.0);
+
+            float2 warpedDelta = float2(mouthDelta.x / mouthWidth, mouthDelta.y / (mouthHeight * mouthShapeWarp));
+            float mouthMask = step(length(warpedDelta), 1.0);
 
             float mouthGradient = smoothstep(0.0, 1.0, length(float2(mouthDelta.x / mouthWidth, mouthDelta.y / mouthHeight)));
 
@@ -179,6 +199,7 @@ fun GhostWithMist(isSpeaking: Boolean,
             // === Ghost body shape with tail wave ===
             float2 ghostUV = centered;
             ghostUV.y += floatOffset;
+            float2 faceUV = ghostUV; // Save before applying the tail wave
             float tailWave = 0.05 * sin(ghostUV.x * 15.0 + iTime * 2.0);
             float tailFactor = smoothstep(0.0, 0.3, ghostUV.y);
             ghostUV.y += tailWave * tailFactor;
@@ -206,13 +227,13 @@ fun GhostWithMist(isSpeaking: Boolean,
             float2 leftEye = float2(-0.15, -0.08);
             float2 rightEye = float2( 0.15, -0.08);
             //float eyes = drawEyes(ghostUV, leftEye, rightEye, isBlinking);
-            EyeData eyes = drawEyes(ghostUV, leftEye, rightEye, isBlinking);
+            EyeData eyes = drawEyes(faceUV, leftEye, rightEye, isBlinking);
 
             // === Pupils ===
-             PupilData pupils = drawPupils(ghostUV, leftEye + pupilOffset, rightEye + pupilOffset, isBlinking);
+             PupilData pupils = drawPupils(faceUV, leftEye + pupilOffset, rightEye + pupilOffset, isBlinking);
 
             // === Mouth ===
-             MouthData mouth = drawMouth(ghostUV, iTime, isSpeaking);
+             MouthData mouth = drawMouth(faceUV, iTime, isSpeaking);
 
             // === Mist background using fbm noise ===
             float2 mistUV = uv * 3.0 + float2(iTime * 0.08, iTime * 0.03);
@@ -273,25 +294,26 @@ fun GhostWithMist(isSpeaking: Boolean,
     val context = LocalContext.current
 
     val shader = remember {
-//        val shaderCode = context.resources
-//            .openRawResource(R.raw.ghost_and_mist_shader)
-//            .bufferedReader()
-//            .use { it.readText() }
         RuntimeShader(ghostShader)
     }
+
+    val animatedSpeaking by animateFloatAsState(
+        targetValue = if (isSpeaking) 1f else 0f,
+        animationSpec = tween(durationMillis = 300)
+    )
 
     var canvasSize by remember { mutableStateOf(Size(1f, 1f)) }
 
     LaunchedEffect(time, isSpeaking, canvasSize) {
         shader.setFloatUniform("iTime", time)
-        shader.setFloatUniform("isSpeaking", if (isSpeaking) 1f else 0f)
+        shader.setFloatUniform("isSpeaking", animatedSpeaking)
         shader.setFloatUniform("iResolution", canvasSize.width, canvasSize.height)
     }
 
     Canvas(modifier = modifier.fillMaxSize()) {
         canvasSize = size
         shader.setFloatUniform("iTime", time)
-        shader.setFloatUniform("isSpeaking", if (isSpeaking) 1f else 0f)
+        shader.setFloatUniform("isSpeaking", animatedSpeaking)
         shader.setFloatUniform("iResolution", size.width, size.height)
 
         drawRect(
