@@ -10,6 +10,7 @@ import com.example.ghostai.service.ElevenLabsService
 import com.example.ghostai.service.OpenAIService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -19,7 +20,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.Dispatcher
 import timber.log.Timber
 import java.util.Locale
 import javax.inject.Inject
@@ -51,32 +51,27 @@ class GhostViewModel @Inject constructor(
         }
     }
 
-    fun speakWithCustomVoice(text: String) {
-        viewModelScope.launch {
-            val audioDataResult =
-                withContext(Dispatchers.IO) {
-                    elevenLabsService.synthesizeSpeech(text)
-                }
-            if (audioDataResult is ElevenLabsSpeechToTextResult.Success) {
-                withContext(Dispatchers.Main) {
-                    // Indicate that the ghost is speaking (triggers mouth animation)
-                    _conversationState.value = ConversationState.GhostTalking
+    suspend fun speakWithCustomVoice(result: ElevenLabsSpeechToTextResult) {
+        if (result is ElevenLabsSpeechToTextResult.Success) {
+            withContext(Dispatchers.Main) {
+                // Indicate that the ghost is speaking (triggers mouth animation)
+                _conversationState.value = ConversationState.GhostTalking
 
-                    elevenLabsService.playAudio(application, audioDataResult.audioData,
-                        onComplete = {
-                            // Ghost is done speaking
-                            _conversationState.value = ConversationState.Idle
-                        },
-                        onError = {
-                            Timber.e("Error during playback: $it")
-                            _conversationState.value = ConversationState.Idle
-                        }
-                    )
-                }
-            } else {
-                Timber.e("Failed to synthesize voice: ${(audioDataResult as ElevenLabsSpeechToTextResult.Failure).errorMessage}")
-                _conversationState.value = ConversationState.Idle
+                elevenLabsService.playAudio(
+                    application, result.audioData,
+                    onComplete = {
+                        // Ghost is done speaking
+                        _conversationState.value = ConversationState.Idle
+                    },
+                    onError = {
+                        Timber.e("Error during playback: $it")
+                        _conversationState.value = ConversationState.Idle
+                    }
+                )
             }
+        } else {
+            Timber.e("Failed to synthesize voice: ${(result as ElevenLabsSpeechToTextResult.Failure).errorMessage}")
+            _conversationState.value = ConversationState.Idle
         }
     }
 
@@ -108,16 +103,20 @@ class GhostViewModel @Inject constructor(
     }
 
     fun onUserSpeechEnd(result: String?) {
-        if (_conversationState.value == ConversationState.UserTalking) {
             _conversationState.value = ConversationState.Idle
             maybeRestartListening()
-        }
+
         Timber.d("CGH: onUserSpeechEnd: $result")
-        viewModelScope.launch {
-            result?.let {
-                val reply = openAIService.getGhostReply(result)
-                //  speak(reply)
-                speakWithCustomVoice(reply)
+        if(!result.isNullOrBlank()) {
+            viewModelScope.launch {
+                    val openAiResponse = async { openAIService.getGhostReply(result) }
+
+                    val elevenLabsAudio = async {
+                        val text = openAiResponse.await()
+                        elevenLabsService.synthesizeSpeech(text)
+                    }
+
+                    speakWithCustomVoice(elevenLabsAudio.await())
             }
         }
     }
@@ -130,7 +129,6 @@ class GhostViewModel @Inject constructor(
             speechRecognizerManager?.startListening()
         }
     }
-
 
     private fun maybeRestartListening() {
         if (_conversationState.value == ConversationState.Idle) {
@@ -154,4 +152,3 @@ class GhostViewModel @Inject constructor(
         speechRecognizerManager?.destroy()
     }
 }
-
