@@ -1,6 +1,7 @@
 package com.example.ghostai
 
 import android.app.Application
+import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -34,6 +35,7 @@ class GhostViewModel @Inject constructor(
 
     private val tts: TextToSpeech
     private var speechRecognizerManager: SpeechRecognizerManager? = null
+    private var isRecoveringRecognizer = false
 
     private val _conversationState = MutableStateFlow(ConversationState.Idle)
     private val conversationState: StateFlow<ConversationState> = _conversationState.asStateFlow()
@@ -100,13 +102,67 @@ class GhostViewModel @Inject constructor(
 
                 val elevenLabsAudio = async {
                     val text = openAiResponse.await()
+                    Timber.d("CGH: OpenAI response: $text")
                     elevenLabsService.synthesizeSpeech(text)
                 }
 
                 speakWithCustomVoice(elevenLabsAudio.await())
             }
+        } else {
+            // If result is null or blank, restart the mic directly
+            Timber.d("CGH: null response from speech recognizer. Restarting mic.")
+            viewModelScope.launch {
+                delay(500) // Give the recognizer a brief pause to reset
+                speechRecognizerManager?.stopListening()
+                delay(250)
+                speechRecognizerManager?.startListening()
+            }
         }
     }
+
+    fun onSpeechRecognizerError(code: Int, message: String) {
+        Timber.e("SpeechRecognizer error $code: $message")
+
+        // Ensure we exit user-talking state
+        if (_conversationState.value == ConversationState.UserTalking) {
+            onUserSpeechEnd(null)
+        }
+
+        // Prevent recursive or rapid repeated resets
+        if (isRecoveringRecognizer) {
+            Timber.w("Already recovering recognizer — skipping duplicate reset.")
+            return
+        }
+
+        when (code) {
+            SpeechRecognizer.ERROR_CLIENT,
+            SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> {
+                isRecoveringRecognizer = true
+                // These typically require full reset
+                speechRecognizerManager?.destroy()
+                speechRecognizerManager = SpeechRecognizerManager(
+                    application,
+                    onStart = { onUserSpeechStart() },
+                    onResult = { onUserSpeechEnd(it) },
+                    onError = { code, msg -> onSpeechRecognizerError(code, msg) }
+                )
+            }
+
+            else -> {
+                // Recoverable errors — just restart
+                Timber.d("Handling recoverable recognizer error: $code")
+
+                // Delay and try to recover
+                viewModelScope.launch {
+                    delay(500)
+                    speechRecognizerManager?.stopListening()
+                    delay(250)
+                    speechRecognizerManager?.startListening()
+                }
+            }
+        }
+    }
+
 
     fun restartRecognizerWithDelay() {
         viewModelScope.launch {
