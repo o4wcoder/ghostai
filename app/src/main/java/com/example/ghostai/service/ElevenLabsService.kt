@@ -4,8 +4,6 @@ import android.content.Context
 import android.media.MediaPlayer
 import com.example.ghostai.network.ktorHttpClient
 import com.example.ghostai.network.model.ElevenLabsSpeechToTextResult
-import com.example.ghostai.network.model.Voice
-import com.example.ghostai.network.model.VoicesResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.request.accept
 import io.ktor.client.request.get
@@ -17,7 +15,6 @@ import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
-import io.ktor.http.headers
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.toByteArray
 import kotlinx.serialization.json.Json
