@@ -224,9 +224,8 @@ fun GhostWithMist(isSpeaking: Boolean,
             vec2 pupilOffset = randomPupilOffset(moveCycle) * moveProgress * (1.0 - isBlinking);
 
             // === Eye shape and position ===
-            float2 leftEye = float2(-0.15, -0.08);
-            float2 rightEye = float2( 0.15, -0.08);
-            //float eyes = drawEyes(ghostUV, leftEye, rightEye, isBlinking);
+            float2 leftEye = float2(-0.12, -0.08);
+            float2 rightEye = float2( 0.12, -0.08);
             EyeData eyes = drawEyes(faceUV, leftEye, rightEye, isBlinking);
 
             // === Pupils ===
