@@ -11,7 +11,7 @@ import com.example.ghostai.service.ElevenLabsService
 import com.example.ghostai.service.OpenAIService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -36,8 +36,9 @@ constructor(
     private val tts: TextToSpeech
     private var speechRecognizerManager: SpeechRecognizerManager? = null
     private var isRecoveringRecognizer = false
-    private var isProcessingResponse = false
 
+    private val userInputChannel = Channel<String>(Channel.UNLIMITED)
+    private val ghostResponseChannel = Channel<String>(Channel.UNLIMITED)
     private val _conversationState = MutableStateFlow(ConversationState.Idle)
     val conversationState: StateFlow<ConversationState> = _conversationState.asStateFlow()
 
@@ -53,6 +54,27 @@ constructor(
                     tts.language = Locale.US
                 }
             }
+
+        observeUserInputQueue()
+        observeGhostResponseQueue()
+    }
+
+    private fun observeUserInputQueue() {
+        viewModelScope.launch {
+            for (input in userInputChannel) {
+                val openAiResponse = openAIService.getGhostReply(input).trim()
+                ghostResponseChannel.send(openAiResponse)
+            }
+        }
+    }
+
+    private fun observeGhostResponseQueue() {
+        viewModelScope.launch {
+            for (reply in ghostResponseChannel) {
+                val elevenLabsAudio = elevenLabsService.synthesizeSpeech(reply)
+                speakWithCustomVoice(elevenLabsAudio)
+            }
+        }
     }
 
     fun setSpeechRecognizer(manager: SpeechRecognizerManager) {
@@ -74,29 +96,10 @@ constructor(
 
         Timber.d("CGH: onUserSpeechEnd: $result")
 
-        if (!result.isNullOrBlank() && !isProcessingResponse) {
-            isProcessingResponse = true
-            viewModelScope.launch {
-                val openAiResponse = async { openAIService.getGhostReply(result) }
-
-                val elevenLabsAudio =
-                    async {
-                        val text = openAiResponse.await().trim()
-                        Timber.d("CGH: OpenAI response: $text")
-                        elevenLabsService.synthesizeSpeech(text)
-                    }
-
-                speakWithCustomVoice(elevenLabsAudio.await())
-                isProcessingResponse = false
-            }
+        if (!result.isNullOrBlank()) {
+            userInputChannel.trySend(result)
         } else {
-            Timber.d("CGH: null or blank user speech — restarting recognizer")
-            viewModelScope.launch {
-                delay(500)
-                speechRecognizerManager?.stopListening()
-                delay(250)
-                maybeRestartListening()
-            }
+            restartRecognizerWithDelay()
         }
     }
 
@@ -105,7 +108,7 @@ constructor(
             withContext(Dispatchers.Main) {
                 _conversationState.value = ConversationState.GhostTalking
 
-                speechRecognizerManager?.stopListening()
+                stopListening()
 
                 elevenLabsService.playAudio(
                     application,
@@ -148,7 +151,6 @@ constructor(
             SpeechRecognizer.ERROR_RECOGNIZER_BUSY,
             -> {
                 isRecoveringRecognizer = true
-
                 speechRecognizerManager?.destroy()
                 speechRecognizerManager =
                     SpeechRecognizerManager(
@@ -166,12 +168,7 @@ constructor(
             }
 
             else -> {
-                viewModelScope.launch {
-                    delay(500)
-                    speechRecognizerManager?.stopListening()
-                    delay(250)
-                    maybeRestartListening()
-                }
+                restartRecognizerWithDelay()
             }
         }
     }
@@ -180,6 +177,15 @@ constructor(
         if (_conversationState.value == ConversationState.Idle) {
             Timber.d("CGH: maybeRestartListening() called")
             speechRecognizerManager?.startListening()
+        }
+    }
+
+    private fun restartRecognizerWithDelay() {
+        viewModelScope.launch {
+            delay(500)
+            stopListening()
+            delay(250)
+            maybeRestartListening()
         }
     }
 
