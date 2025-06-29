@@ -12,7 +12,6 @@ import com.example.ghostai.ui.theme.GhostAITheme
 
 @Composable
 fun MainScreen(isSpeaking: Boolean) {
-
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         GhostWithMist(isSpeaking = isSpeaking, modifier = Modifier.align(Alignment.Center))
     }
@@ -23,6 +22,5 @@ fun MainScreen(isSpeaking: Boolean) {
 private fun PreviewMainScreen() {
     GhostAITheme {
         MainScreen(false)
-
     }
 }

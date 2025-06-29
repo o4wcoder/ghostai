@@ -21,13 +21,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.ghostai.oldui.rememberStableTime
 import com.example.ghostai.ui.theme.GhostAITheme
+import com.example.ghostai.util.pointerTapEvents
 import org.intellij.lang.annotations.Language
 
 @Composable
-fun GhostWithMist(isSpeaking: Boolean,
-                  modifier: Modifier = Modifier,
-                  time: Float = rememberStableTime()) {
-
+fun GhostWithMist(
+    isSpeaking: Boolean,
+    modifier: Modifier = Modifier,
+    time: Float = rememberStableTime(),
+) {
     @Language("AGSL")
     val ghostShader = """
         uniform float2 iResolution;
@@ -298,7 +300,7 @@ fun GhostWithMist(isSpeaking: Boolean,
 
     val animatedSpeaking by animateFloatAsState(
         targetValue = if (isSpeaking) 1f else 0f,
-        animationSpec = tween(durationMillis = 300)
+        animationSpec = tween(durationMillis = 300),
     )
 
     var canvasSize by remember { mutableStateOf(Size(1f, 1f)) }
@@ -309,7 +311,16 @@ fun GhostWithMist(isSpeaking: Boolean,
         shader.setFloatUniform("iResolution", canvasSize.width, canvasSize.height)
     }
 
-    Canvas(modifier = modifier.fillMaxSize()) {
+    Canvas(
+        modifier = modifier.fillMaxSize()
+            .pointerTapEvents(
+                onTap = {
+                },
+                onDoubleTap = {
+                },
+            ),
+
+    ) {
         canvasSize = size
         shader.setFloatUniform("iTime", time)
         shader.setFloatUniform("isSpeaking", animatedSpeaking)
@@ -318,7 +329,7 @@ fun GhostWithMist(isSpeaking: Boolean,
         drawRect(
             brush = object : ShaderBrush() {
                 override fun createShader(size: Size): Shader = shader
-            }
+            },
         )
     }
 }
@@ -330,4 +341,3 @@ fun GhostWithMistPreview() {
         GhostWithMist(isSpeaking = true, time = 2.0F, modifier = Modifier.background(Color.Black))
     }
 }
-

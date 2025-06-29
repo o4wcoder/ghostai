@@ -146,7 +146,7 @@ constructor(
         when (code) {
             SpeechRecognizer.ERROR_CLIENT,
             SpeechRecognizer.ERROR_RECOGNIZER_BUSY,
-                -> {
+            -> {
                 isRecoveringRecognizer = true
 
                 speechRecognizerManager?.destroy()

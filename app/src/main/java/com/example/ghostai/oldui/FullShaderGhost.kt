@@ -1,10 +1,19 @@
 package com.example.ghostai.oldui
 
 import android.graphics.RuntimeShader
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Shader
@@ -16,7 +25,7 @@ import com.example.ghostai.R
 @Composable
 fun FullShaderGhost(
     isSpeaking: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
 
@@ -34,9 +43,9 @@ fun FullShaderGhost(
         initialValue = 0f,
         targetValue = 100_000f,
         animationSpec = infiniteRepeatable(
-            animation = tween(100_000 * 1000, easing = LinearEasing)
+            animation = tween(100_000 * 1000, easing = LinearEasing),
         ),
-        label = "shaderTime"
+        label = "shaderTime",
     )
 
     var canvasSize by remember { mutableStateOf(Size.Zero) }
@@ -63,9 +72,7 @@ fun FullShaderGhost(
         drawRect(
             brush = object : ShaderBrush() {
                 override fun createShader(size: Size): Shader = shader
-            }
+            },
         )
     }
 }
-
-

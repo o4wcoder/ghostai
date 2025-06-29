@@ -1,27 +1,29 @@
 package com.example.ghostai
 
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.*
-import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
 
 @Composable
 fun AnimatedMistyBackground(
     imageIds: List<Int>,
     modifier: Modifier = Modifier,
-    crossfadeDuration: Int = 6000
+    crossfadeDuration: Int = 6000,
 ) {
     require(imageIds.size >= 2) { "Provide at least two mist images for animation." }
 
@@ -34,9 +36,9 @@ fun AnimatedMistyBackground(
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(crossfadeDuration, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
+            repeatMode = RepeatMode.Restart,
         ),
-        label = "crossfadeAlpha"
+        label = "crossfadeAlpha",
     )
 
     // Track alpha threshold to trigger image index change
@@ -53,7 +55,7 @@ fun AnimatedMistyBackground(
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
-            alpha = 1f - alpha
+            alpha = 1f - alpha,
         )
 
         Image(
@@ -61,8 +63,7 @@ fun AnimatedMistyBackground(
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
-            alpha = alpha
+            alpha = alpha,
         )
     }
 }
-

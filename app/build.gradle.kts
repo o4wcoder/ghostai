@@ -1,12 +1,13 @@
-import java.util.Properties
 import java.io.FileInputStream
+import java.util.Properties
 
-val localProperties = Properties().apply {
-    val localPropsFile = rootProject.file("local.properties")
-    if (localPropsFile.exists()) {
-        load(FileInputStream(localPropsFile))
+val localProperties =
+    Properties().apply {
+        val localPropsFile = rootProject.file("local.properties")
+        if (localPropsFile.exists()) {
+            load(FileInputStream(localPropsFile))
+        }
     }
-}
 
 plugins {
     alias(libs.plugins.android.application)
@@ -33,7 +34,6 @@ android {
 
         buildConfigField("String", "OPENAI_API_KEY", "\"${localProperties["OPENAI_API_KEY"]}\"")
         buildConfigField("String", "ELEVEN_LABS_API_KEY", "\"${localProperties["ELEVENLABS_API_KEY"]}\"")
-
     }
 
     buildTypes {
@@ -41,7 +41,7 @@ android {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
         }
     }
@@ -57,7 +57,6 @@ android {
         buildConfig = true
     }
 }
-
 
 dependencies {
 
@@ -91,12 +90,15 @@ dependencies {
 spotless {
     kotlin {
         target("**/*.kt")
-        ktlint("1.2.1")
+        ktlint("1.0.1").editorConfigOverride(
+            mapOf(
+                "ktlint_standard_function-naming" to "disabled",
+            ),
+        )
     }
 
     kotlinGradle {
         target("**/*.gradle.kts")
-        ktlint()
+        ktlint("1.0.1")
     }
 }
-

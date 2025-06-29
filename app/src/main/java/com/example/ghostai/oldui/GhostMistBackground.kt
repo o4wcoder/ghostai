@@ -42,9 +42,9 @@ fun GhostMistBackground(modifier: Modifier = Modifier) {
         initialValue = 0f,
         targetValue = 100_000f,
         animationSpec = infiniteRepeatable(
-            animation = tween(100_000 * 1000, easing = LinearEasing)
+            animation = tween(100_000 * 1000, easing = LinearEasing),
         ),
-        label = "mist-time"
+        label = "mist-time",
     )
 
     // Update shader uniforms
@@ -62,7 +62,7 @@ fun GhostMistBackground(modifier: Modifier = Modifier) {
         drawRect(
             brush = object : ShaderBrush() {
                 override fun createShader(size: Size): Shader = shader
-            }
+            },
         )
     }
 }

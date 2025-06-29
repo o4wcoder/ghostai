@@ -29,7 +29,7 @@ class MainActivity : ComponentActivity() {
         val permission = Manifest.permission.RECORD_AUDIO
 
         val permissionLauncher = registerForActivityResult(
-            ActivityResultContracts.RequestPermission()
+            ActivityResultContracts.RequestPermission(),
         ) { isGranted ->
             if (isGranted) {
                 Timber.d("Microphone permission granted")
@@ -41,7 +41,7 @@ class MainActivity : ComponentActivity() {
 
         if (ContextCompat.checkSelfPermission(
                 this,
-                permission
+                permission,
             ) != PackageManager.PERMISSION_GRANTED
         ) {
             permissionLauncher.launch(permission)
@@ -69,11 +69,10 @@ class MainActivity : ComponentActivity() {
             onError = { error, message ->
                 Timber.e("CGH: Speech error: $message")
                 viewModel.onSpeechRecognizerError(error, message)
-            }
+            },
         )
 
         viewModel.setSpeechRecognizer(recognizerManager!!)
-
     }
 
     override fun onDestroy() {
@@ -82,7 +81,6 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 }
-
 
 @Preview(showBackground = true)
 @Composable

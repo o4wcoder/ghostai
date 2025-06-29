@@ -1,8 +1,6 @@
 package com.example.ghostai.bookofshadersexamples
 
 import android.graphics.RuntimeShader
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -20,13 +18,11 @@ import com.example.ghostai.oldui.rememberStableTime
 import com.example.ghostai.ui.theme.GhostAITheme
 import org.intellij.lang.annotations.Language
 
-
 @Composable
 fun ShaderExample(
     modifier: Modifier = Modifier,
-    time: Float = rememberStableTime()
+    time: Float = rememberStableTime(),
 ) {
-
     @Language("AGSL")
     val exampleShader = """
         uniform float2 iResolution;
@@ -75,7 +71,7 @@ fun ShaderExample(
         drawRect(
             brush = object : ShaderBrush() {
                 override fun createShader(size: Size): Shader = shader
-            }
+            },
         )
     }
 }
