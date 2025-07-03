@@ -6,6 +6,7 @@ import android.speech.tts.TextToSpeech
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.ghostai.model.ConversationState
+import com.example.ghostai.model.UserInput
 import com.example.ghostai.network.model.ElevenLabsSpeechToTextResult
 import com.example.ghostai.service.ElevenLabsService
 import com.example.ghostai.service.OpenAIService
@@ -37,7 +38,7 @@ constructor(
     private var speechRecognizerManager: SpeechRecognizerManager? = null
     private var isRecoveringRecognizer = false
 
-    private val userInputChannel = Channel<String>(Channel.UNLIMITED)
+    private val userInputChannel = Channel<UserInput>(Channel.UNLIMITED)
     private val ghostResponseChannel = Channel<String>(Channel.UNLIMITED)
     private val _conversationState = MutableStateFlow(ConversationState.Idle)
     val conversationState: StateFlow<ConversationState> = _conversationState.asStateFlow()
@@ -97,11 +98,21 @@ constructor(
         Timber.d("CGH: onUserSpeechEnd: $result")
 
         if (!result.isNullOrBlank()) {
-            userInputChannel.trySend(result)
+            userInputChannel.trySend(UserInput.Voice(result))
         } else {
             restartRecognizerWithDelay()
         }
     }
+
+    fun onGhostTouched() {
+        if (_conversationState.value == ConversationState.Idle) {
+            _conversationState.value = ConversationState.ProcessingTouch
+            userInputChannel.trySend(UserInput.Touch)
+        } else {
+            Timber.d("CGH: Ignoring touch — ghost is busy: ${_conversationState.value}")
+        }
+    }
+
 
     suspend fun speakWithCustomVoice(result: ElevenLabsSpeechToTextResult) {
         if (result is ElevenLabsSpeechToTextResult.Success) {
