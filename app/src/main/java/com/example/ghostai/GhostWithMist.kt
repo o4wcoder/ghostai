@@ -17,17 +17,18 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shader
 import androidx.compose.ui.graphics.ShaderBrush
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.ghostai.oldui.rememberStableTime
 import com.example.ghostai.ui.theme.GhostAITheme
 import com.example.ghostai.util.pointerTapEvents
 import org.intellij.lang.annotations.Language
+import timber.log.Timber
 
 @Composable
 fun GhostWithMist(
     isSpeaking: Boolean,
     modifier: Modifier = Modifier,
+    onGhostThouched: () -> Unit,
     time: Float = rememberStableTime(),
 ) {
     @Language("AGSL")
@@ -241,6 +242,21 @@ fun GhostWithMist(
             float mistNoise = fbm(mistUV);
             float mistStrength = 0.5;
             float3 mistColor = float3(0.85) * (mistNoise * mistStrength);
+            
+            // === Lightning trigger (random flash like blinking) ===
+            float lightningSeed = floor(iTime * 2.0);  // check twice a second
+            float lightningRand = fract(sin(lightningSeed * 91.345) * 47453.25);
+            float lightningActive = step(0.95, lightningRand); // ~0.5% chance per check
+
+            // Fade lightning within frame
+            float lightningFade = smoothstep(0.0, 0.5, fract(iTime)) * (1.0 - smoothstep(0.5, 01.0, fract(iTime)));
+            float lightning = lightningActive * lightningFade;
+
+            // Apply lightning as a bright flash
+            // Example: lightning stronger at top of screen
+            float lightningMask = smoothstep(1.0, 0.4, uv.y);  // fades from 0 at bottom to 1 at top
+            mistColor += lightning * lightningMask * vec3(0.3, 0.4, 0.5); // bluish, not white
+
 
             // === Ghost glow influence on mist ===
             float3 ghostGlowColor = float3(0.2 + 0.4 * isSpeaking, 1.0, 0.2 + 0.4 * isSpeaking);
@@ -249,7 +265,7 @@ fun GhostWithMist(
 
             mistColor *= 1.0 - 0.3 * glowFalloff;
             mistColor += ghostGlowColor * glowFalloff * 1.5;
-
+            
             // === Ghost body shading (3D effect) ===
             float3 ghostInnerColor = float3(0.2, 1.0, 0.2);  // bright green
             float3 ghostEdgeColor  = float3(0.0, 0.4, 0.0);  // darker green
@@ -292,8 +308,6 @@ fun GhostWithMist(
         }
     """.trimIndent()
 
-    val context = LocalContext.current
-
     val shader = remember {
         RuntimeShader(ghostShader)
     }
@@ -315,6 +329,8 @@ fun GhostWithMist(
         modifier = modifier.fillMaxSize()
             .pointerTapEvents(
                 onTap = {
+                    Timber.d("CGH: onGhostTouched()")
+                    onGhostThouched()
                 },
                 onDoubleTap = {
                 },
@@ -338,6 +354,6 @@ fun GhostWithMist(
 @Composable
 fun GhostWithMistPreview() {
     GhostAITheme {
-        GhostWithMist(isSpeaking = true, time = 2.0F, modifier = Modifier.background(Color.Black))
+        GhostWithMist(isSpeaking = true, time = 2.0F, modifier = Modifier.background(Color.Black), onGhostThouched = {})
     }
 }

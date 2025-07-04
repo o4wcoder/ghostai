@@ -1,3 +1,6 @@
 package com.example.ghostai.model
 
-data class UserInput()
+sealed interface UserInput {
+    data class Voice(val text: String) : UserInput
+    data object Touch : UserInput
+}
