@@ -76,6 +76,8 @@ dependencies {
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.serialization.kotlinx.json)
     implementation(libs.kotlin.serialization)
+    implementation(libs.exoplayer)
+
     kapt(libs.hilt.compiler)
 
     testImplementation(libs.junit)

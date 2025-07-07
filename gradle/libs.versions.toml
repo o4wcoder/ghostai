@@ -14,6 +14,7 @@ timberVersion = "5.0.1"
 ktorVersion = "3.2.0"
 kotlinJson = "1.8.1"
 spotlessVersion = "7.0.4"
+exoplayerVersion = "1.7.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -39,6 +40,7 @@ ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "k
 ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktorVersion" }
 ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktorVersion" }
 kotlin-serialization = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version = "kotlinJson" }
+exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "exoplayerVersion" }
 
 
 [plugins]

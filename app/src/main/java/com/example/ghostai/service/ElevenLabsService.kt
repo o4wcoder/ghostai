@@ -2,12 +2,20 @@ package com.example.ghostai.service
 
 import android.app.Application
 import android.content.Context
-import android.media.AudioTrack
 import android.media.MediaPlayer
+import android.util.Base64
+import androidx.annotation.OptIn
+import androidx.core.net.toUri
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import com.example.ghostai.network.model.ElevenLabsSpeechToTextResult
 import io.ktor.client.HttpClient
 import io.ktor.client.request.accept
-import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -18,7 +26,10 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.toByteArray
-import kotlinx.serialization.json.Json
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
@@ -31,7 +42,6 @@ import org.json.JSONObject
 import timber.log.Timber
 import java.io.ByteArrayOutputStream
 import java.io.File
-import java.util.Base64
 
 private const val ELEVEN_LABS_API_BASE = "https://api.elevenlabs.io/v1"
 
@@ -45,8 +55,8 @@ class ElevenLabsService(
     private val application: Application,
 ) {
     private var mediaPlayer: MediaPlayer? = null
-    private var audioTrack: AudioTrack? = null
     private var webSocket: WebSocket? = null
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     suspend fun synthesizeSpeech(text: String): ElevenLabsSpeechToTextResult {
         val url = "$ELEVEN_LABS_API_BASE/text-to-speech/$CHAROLETTE_VOICE_ID"
@@ -120,11 +130,13 @@ class ElevenLabsService(
         text: String,
         voiceId: String = CHAROLETTE_VOICE_ID,
         onError: (Exception) -> Unit = {},
-        onEnd: () -> Unit = {},
+        onGhostSpeechEnd: () -> Unit = {},
+        onGhostSpeechStart: () -> Unit = {},
     ) {
         stopStreamingSpeech()
 
-        val mp3Buffer = ByteArrayOutputStream()
+        val buffer = ByteArrayOutputStream()
+        var exoPlayer: ExoPlayer? = null
 
         val request = Request.Builder()
             .url("wss://api.elevenlabs.io/v1/text-to-speech/$voiceId/stream-input")
@@ -135,7 +147,7 @@ class ElevenLabsService(
             request,
             object : WebSocketListener() {
                 override fun onOpen(webSocket: WebSocket, response: Response) {
-                    Timber.d("CGH: WebSocket opened for streaming")
+                    Timber.d("WebSocket opened for streaming")
 
                     val msg = """
                 {
@@ -148,66 +160,67 @@ class ElevenLabsService(
                 }
                     """.trimIndent()
 
-                    Timber.d("CGH: sending WebSocket message: $msg")
                     webSocket.send(msg)
 
+                    // Signal end of input (required so server knows you're done)
                     val endMsg = """{"text": ""}"""
-                    Timber.d("CGH: sending WebSocket end-of-input: $endMsg")
                     webSocket.send(endMsg)
+
+                    // Set up ExoPlayer
+                    exoPlayer = ExoPlayer.Builder(application.applicationContext).build().apply {
+                        addListener(object : Player.Listener {
+                            override fun onPlaybackStateChanged(state: Int) {
+                                when (state) {
+                                    Player.STATE_READY -> {
+                                        if (exoPlayer?.playWhenReady == true) {
+                                            onGhostSpeechStart()
+                                        }
+                                    }
+                                    Player.STATE_ENDED -> {
+                                        stopStreamingSpeech()
+                                        onGhostSpeechEnd()
+                                    }
+                                    else -> {}
+                                }
+                            }
+
+                            override fun onPlayerError(error: PlaybackException) {
+                                Timber.e(error, "ExoPlayer playback error")
+                                stopStreamingSpeech()
+                                onError(error)
+                            }
+                        })
+                    }
                 }
 
                 override fun onMessage(webSocket: WebSocket, text: String) {
-                    Timber.d("CGH: got control message: $text")
-                    try {
-                        val json = JSONObject(text)
-                        if (json.has("audio") && !json.isNull("audio")) {
-                            val base64Audio = json.getString("audio")
-                            val audioBytes = Base64.getDecoder().decode(base64Audio)
-                            mp3Buffer.write(audioBytes)
-                        }
+                    Timber.d("Control message: $text")
+                    val json = JSONObject(text)
 
-                        if (json.optBoolean("isFinal", false)) {
-                            stopStreamingSpeech()
+                    if (json.has("audio")) {
+                        val audioBase64 = json.getString("audio")
+                        val audioBytes = Base64.decode(audioBase64, Base64.DEFAULT)
+                        buffer.write(audioBytes)
+                    }
 
-                            val tempFile = File.createTempFile("streamed_tts", ".mp3", application.cacheDir)
-                            tempFile.writeBytes(mp3Buffer.toByteArray())
-                            Timber.d("CGH: wrote MP3 file: ${tempFile.absolutePath}")
+                    if (json.optBoolean("isFinal", false)) {
+                        Timber.d("isFinal received — finalizing playback")
+                        playBufferedMp3(application.applicationContext, buffer.toByteArray(), exoPlayer!!)
+                    }
 
-                            val mediaPlayer = MediaPlayer().apply {
-                                setDataSource(tempFile.absolutePath)
-                                setOnPreparedListener { start() }
-                                setOnCompletionListener {
-                                    release()
-                                    onEnd()
-                                }
-                                setOnErrorListener { _, what, extra ->
-                                    release()
-                                    onError(Exception("MediaPlayer error: what=$what extra=$extra"))
-                                    true
-                                }
-                                prepareAsync()
-                            }
-                        }
-
-                        if (json.has("error")) {
-                            Timber.e("CGH: ElevenLabs error: $text")
-                            stopStreamingSpeech()
-                            onError(Exception("Server error: $text"))
-                        }
-                    } catch (e: Exception) {
-                        Timber.e(e, "CGH: Error parsing control message")
+                    if (json.has("error")) {
                         stopStreamingSpeech()
-                        onError(e)
+                        onError(Exception("Server error: $text"))
                     }
                 }
 
                 override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-                    Timber.d("CGH: WebSocket closing: $code $reason")
+                    Timber.d("WebSocket closing: $code $reason")
                     stopStreamingSpeech()
                 }
 
                 override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                    Timber.e(t, "CGH: WebSocket failure")
+                    Timber.e(t, "WebSocket failure")
                     stopStreamingSpeech()
                     onError(Exception("WebSocket failure: ${t.message}"))
                 }
@@ -215,11 +228,25 @@ class ElevenLabsService(
         )
     }
 
-    fun stopStreamingSpeech() {
-        audioTrack?.stop()
-        audioTrack?.release()
-        audioTrack = null
+    @OptIn(UnstableApi::class)
+    private fun playBufferedMp3(context: Context, mp3Data: ByteArray, exoPlayer: ExoPlayer) {
+        val tempFile = File.createTempFile("ghost_stream", ".mp3", context.cacheDir).apply {
+            writeBytes(mp3Data)
+            deleteOnExit()
+        }
 
+        scope.launch(Dispatchers.Main) {
+            val dataSourceFactory = DefaultDataSource.Factory(context)
+            val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory)
+                .createMediaSource(MediaItem.fromUri(tempFile.toUri()))
+
+            exoPlayer.setMediaSource(mediaSource)
+            exoPlayer.prepare()
+            exoPlayer.play()
+        }
+    }
+
+    fun stopStreamingSpeech() {
         webSocket?.close(1000, "Closed by client")
         webSocket = null
     }

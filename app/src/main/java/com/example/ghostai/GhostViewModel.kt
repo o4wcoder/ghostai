@@ -73,7 +73,6 @@ constructor(
         viewModelScope.launch {
             for (reply in ghostResponseChannel) {
                 withContext(Dispatchers.Main) {
-                    _conversationState.value = ConversationState.GhostTalking
                     stopListening()
 
                     elevenLabsService.startStreamingSpeech(
@@ -83,10 +82,13 @@ constructor(
                             _conversationState.value = ConversationState.Idle
                             maybeRestartListening()
                         },
-                        onEnd = {
+                        onGhostSpeechEnd = {
                             Timber.d("CGH: Streaming finished")
                             _conversationState.value = ConversationState.Idle
                             maybeRestartListening()
+                        },
+                        onGhostSpeechStart = {
+                            _conversationState.value = ConversationState.GhostTalking
                         },
                     )
                 }
@@ -202,7 +204,9 @@ constructor(
     private fun maybeRestartListening() {
         if (_conversationState.value == ConversationState.Idle) {
             Timber.d("CGH: maybeRestartListening() called")
-            speechRecognizerManager?.startListening()
+            viewModelScope.launch(Dispatchers.Main) {
+                speechRecognizerManager?.startListening()
+            }
         }
     }
 
@@ -216,7 +220,9 @@ constructor(
     }
 
     fun stopListening() {
-        speechRecognizerManager?.stopListening()
+        viewModelScope.launch(Dispatchers.Main) {
+            speechRecognizerManager?.stopListening()
+        }
     }
 
     override fun onCleared() {
