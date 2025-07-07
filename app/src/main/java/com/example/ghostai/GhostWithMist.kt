@@ -112,7 +112,7 @@ fun GhostWithMist(
         }
 
         PupilData drawPupils(vec2 uv, vec2 leftEye, vec2 rightEye, float isBlinking) {
-            float pupilRadius = 0.015;
+            float pupilRadius = 0.020;
 
             float2 leftDelta = uv - leftEye;
             float2 rightDelta = uv - rightEye;

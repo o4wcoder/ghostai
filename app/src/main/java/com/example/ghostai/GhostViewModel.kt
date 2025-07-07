@@ -72,8 +72,24 @@ constructor(
     private fun observeGhostResponseQueue() {
         viewModelScope.launch {
             for (reply in ghostResponseChannel) {
-                val elevenLabsAudio = elevenLabsService.synthesizeSpeech(reply)
-                speakWithCustomVoice(elevenLabsAudio)
+                withContext(Dispatchers.Main) {
+                    _conversationState.value = ConversationState.GhostTalking
+                    stopListening()
+
+                    elevenLabsService.startStreamingSpeech(
+                        text = reply,
+                        onError = {
+                            Timber.e("CGH: Streaming error: $it")
+                            _conversationState.value = ConversationState.Idle
+                            maybeRestartListening()
+                        },
+                        onEnd = {
+                            Timber.d("CGH: Streaming finished")
+                            _conversationState.value = ConversationState.Idle
+                            maybeRestartListening()
+                        },
+                    )
+                }
             }
         }
     }
@@ -112,7 +128,6 @@ constructor(
             Timber.d("CGH: Ignoring touch — ghost is busy: ${_conversationState.value}")
         }
     }
-
 
     suspend fun speakWithCustomVoice(result: ElevenLabsSpeechToTextResult) {
         if (result is ElevenLabsSpeechToTextResult.Success) {

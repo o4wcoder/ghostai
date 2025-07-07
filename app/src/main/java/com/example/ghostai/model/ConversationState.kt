@@ -4,5 +4,5 @@ enum class ConversationState {
     Idle,
     UserTalking,
     GhostTalking,
-    ProcessingTouch
+    ProcessingTouch,
 }
