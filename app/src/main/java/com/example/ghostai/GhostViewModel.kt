@@ -6,8 +6,10 @@ import android.speech.tts.TextToSpeech
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.ghostai.model.ConversationState
+import com.example.ghostai.model.Emotion
+import com.example.ghostai.model.GhostReply
+import com.example.ghostai.model.GhostUiState
 import com.example.ghostai.model.UserInput
-import com.example.ghostai.network.model.ElevenLabsSpeechToTextResult
 import com.example.ghostai.service.ElevenLabsService
 import com.example.ghostai.service.OpenAIService
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -15,11 +17,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -37,16 +37,21 @@ constructor(
     private val tts: TextToSpeech
     private var speechRecognizerManager: SpeechRecognizerManager? = null
     private var isRecoveringRecognizer = false
-
     private val userInputChannel = Channel<UserInput>(Channel.UNLIMITED)
-    private val ghostResponseChannel = Channel<String>(Channel.UNLIMITED)
-    private val _conversationState = MutableStateFlow(ConversationState.Idle)
-    val conversationState: StateFlow<ConversationState> = _conversationState.asStateFlow()
+    private val ghostResponseChannel = Channel<GhostReply>(Channel.UNLIMITED)
+    // private val _conversationState = MutableStateFlow(ConversationState.Idle)
+    // private val conversationState: StateFlow<ConversationState> = _conversationState.asStateFlow()
 
-    val isSpeaking =
-        conversationState
-            .map { it == ConversationState.GhostTalking }
-            .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    private val _ghostUiState = MutableStateFlow(GhostUiState(ConversationState.Idle, Emotion.Neutral))
+    val ghostUiState: StateFlow<GhostUiState> = _ghostUiState.asStateFlow()
+//    val uiModel: StateFlow<GhostUiState> = combine(_conversationState) {
+//        val conversationState = it[0]
+//        GhostUiState(conversationState, Emotion.Neutral)
+//    }
+//        .collect()
+//        _conversationState
+//            .map { it == ConversationState.GhostTalking }
+//            .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     init {
         tts =
@@ -63,7 +68,7 @@ constructor(
     private fun observeUserInputQueue() {
         viewModelScope.launch {
             for (input in userInputChannel) {
-                val openAiResponse = openAIService.getGhostReply(input).trim()
+                val openAiResponse = openAIService.getGhostReply(input)
                 ghostResponseChannel.send(openAiResponse)
             }
         }
@@ -75,20 +80,21 @@ constructor(
                 withContext(Dispatchers.Main) {
                     stopListening()
 
+                    updateGhostEmotion(reply.emotion)
                     elevenLabsService.startStreamingSpeech(
-                        text = reply,
+                        text = reply.text,
                         onError = {
                             Timber.e("CGH: Streaming error: $it")
-                            _conversationState.value = ConversationState.Idle
+                            updateConversationState(ConversationState.Idle)
                             maybeRestartListening()
                         },
                         onGhostSpeechEnd = {
                             Timber.d("CGH: Streaming finished")
-                            _conversationState.value = ConversationState.Idle
+                            updateConversationState(ConversationState.Idle)
                             maybeRestartListening()
                         },
                         onGhostSpeechStart = {
-                            _conversationState.value = ConversationState.GhostTalking
+                            updateConversationState(ConversationState.GhostTalking)
                         },
                     )
                 }
@@ -102,15 +108,15 @@ constructor(
     }
 
     fun onUserSpeechStart() {
-        Timber.d("CGH: onUserSpeechStart() with state: ${_conversationState.value}")
-        if (_conversationState.value == ConversationState.Idle) {
-            _conversationState.value = ConversationState.UserTalking
+        Timber.d("CGH: onUserSpeechStart() with state: ${_ghostUiState.value.conversationState}")
+        if (_ghostUiState.value.conversationState == ConversationState.Idle) {
+            updateConversationState(ConversationState.UserTalking)
         }
     }
 
     fun onUserSpeechEnd(result: String?) {
-        if (_conversationState.value == ConversationState.UserTalking) {
-            _conversationState.value = ConversationState.Idle
+        if (_ghostUiState.value.conversationState == ConversationState.UserTalking) {
+            updateConversationState(ConversationState.Idle)
         }
 
         Timber.d("CGH: onUserSpeechEnd: $result")
@@ -123,39 +129,11 @@ constructor(
     }
 
     fun onGhostTouched() {
-        if (_conversationState.value == ConversationState.Idle) {
-            _conversationState.value = ConversationState.ProcessingTouch
+        if (_ghostUiState.value.conversationState == ConversationState.Idle) {
+            updateConversationState(ConversationState.ProcessingTouch)
             userInputChannel.trySend(UserInput.Touch)
         } else {
-            Timber.d("CGH: Ignoring touch — ghost is busy: ${_conversationState.value}")
-        }
-    }
-
-    suspend fun speakWithCustomVoice(result: ElevenLabsSpeechToTextResult) {
-        if (result is ElevenLabsSpeechToTextResult.Success) {
-            withContext(Dispatchers.Main) {
-                _conversationState.value = ConversationState.GhostTalking
-
-                stopListening()
-
-                elevenLabsService.playAudio(
-                    application,
-                    result.audioData,
-                    onComplete = {
-                        _conversationState.value = ConversationState.Idle
-                        maybeRestartListening()
-                    },
-                    onError = {
-                        Timber.e("CGH: Playback error: $it")
-                        _conversationState.value = ConversationState.Idle
-                        maybeRestartListening()
-                    },
-                )
-            }
-        } else {
-            Timber.e("CGH: TTS synthesis failed: ${(result as ElevenLabsSpeechToTextResult.Failure).errorMessage}")
-            _conversationState.value = ConversationState.Idle
-            maybeRestartListening()
+            Timber.d("CGH: Ignoring touch — ghost is busy: ${_ghostUiState.value.conversationState}")
         }
     }
 
@@ -165,7 +143,7 @@ constructor(
     ) {
         Timber.e("CGH: SpeechRecognizer error $code: $message")
 
-        if (_conversationState.value == ConversationState.UserTalking) {
+        if (_ghostUiState.value.conversationState == ConversationState.UserTalking) {
             onUserSpeechEnd(null)
         }
 
@@ -202,7 +180,7 @@ constructor(
     }
 
     private fun maybeRestartListening() {
-        if (_conversationState.value == ConversationState.Idle) {
+        if (_ghostUiState.value.conversationState == ConversationState.Idle) {
             Timber.d("CGH: maybeRestartListening() called")
             viewModelScope.launch(Dispatchers.Main) {
                 speechRecognizerManager?.startListening()
@@ -229,5 +207,13 @@ constructor(
         super.onCleared()
         tts.shutdown()
         speechRecognizerManager?.destroy()
+    }
+
+    private fun updateGhostEmotion(emotion: Emotion) {
+        _ghostUiState.value = _ghostUiState.value.copy(emotion = emotion)
+    }
+
+    private fun updateConversationState(state: ConversationState) {
+        _ghostUiState.update { it.copy(conversationState = state) }
     }
 }

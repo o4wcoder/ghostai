@@ -51,8 +51,8 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             GhostAITheme {
-                val isSpeaking by viewModel.isSpeaking.collectAsStateWithLifecycle()
-                MainScreen(isSpeaking = isSpeaking, onGhostTouched = {
+                val ghostUiState by viewModel.ghostUiState.collectAsStateWithLifecycle()
+                MainScreen(isSpeaking = ghostUiState.isSpeaking, onGhostTouched = {
                     viewModel.onGhostTouched()
                 })
             }
