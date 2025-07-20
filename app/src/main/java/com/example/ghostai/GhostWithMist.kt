@@ -36,7 +36,7 @@ fun GhostWithMist(
 ) {
     @Language("AGSL")
     val ghostShader = """
-        uniform float2 iResolution;
+        uniform vec2 iResolution;
         uniform float iTime;
         uniform float isSpeaking;
         uniform float uEmotion;
@@ -57,27 +57,27 @@ fun GhostWithMist(
         };
 
 
-        float hash(float2 p) {
-            return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453123);
+        float hash(vec2 p) {
+            return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
         }
 
-        float noise(float2 p) {
-            float2 i = floor(p);
-            float2 f = fract(p);
+        float noise(vec2 p) {
+            vec2 i = floor(p);
+            vec2 f = fract(p);
             float a = hash(i);
-            float b = hash(i + float2(1.0, 0.0));
-            float c = hash(i + float2(0.0, 1.0));
-            float d = hash(i + float2(1.0, 1.0));
-            float2 u = f * f * (3.0 - 2.0 * f);
+            float b = hash(i + vec2(1.0, 0.0));
+            float c = hash(i + vec2(0.0, 1.0));
+            float d = hash(i + vec2(1.0, 1.0));
+            vec2 u = f * f * (3.0 - 2.0 * f);
             return mix(a, b, u.x) +
                    (c - a) * u.y * (1.0 - u.x) +
                    (d - b) * u.x * u.y;
         }
 
-        float fbm(float2 p) {
+        float fbm(vec2 p) {
             float v = 0.0;
             float a = 0.5;
-            float2 shift = float2(100.0);
+            vec2 shift = vec2(100.0);
             for (int i = 0; i < 5; ++i) {
                 v += a * noise(p);
                 p = p * 2.0 + shift;
@@ -89,11 +89,11 @@ fun GhostWithMist(
         EyeData drawEyes(vec2 uv, vec2 leftEye, vec2 rightEye, float isBlinking) {
             float eyeRadiusX = 0.05;
             float eyeRadiusY = mix(0.05, 0.005, isBlinking);
-            float2 leftDelta = uv - leftEye;
-            float2 rightDelta = uv - rightEye;
+            vec2 leftDelta = uv - leftEye;
+            vec2 rightDelta = uv - rightEye;
 
-            float2 leftNorm = float2(leftDelta.x / eyeRadiusX, leftDelta.y / eyeRadiusY);
-            float2 rightNorm = float2(rightDelta.x / eyeRadiusX, rightDelta.y / eyeRadiusY);
+            vec2 leftNorm = vec2(leftDelta.x / eyeRadiusX, leftDelta.y / eyeRadiusY);
+            vec2 rightNorm = vec2(rightDelta.x / eyeRadiusX, rightDelta.y / eyeRadiusY);
 
             float leftDist = length(leftNorm);
             float rightDist = length(rightNorm);
@@ -118,8 +118,8 @@ fun GhostWithMist(
         PupilData drawPupils(vec2 uv, vec2 leftEye, vec2 rightEye, float isBlinking) {
             float pupilRadius = 0.020;
 
-            float2 leftDelta = uv - leftEye;
-            float2 rightDelta = uv - rightEye;
+            vec2 leftDelta = uv - leftEye;
+            vec2 rightDelta = uv - rightEye;
 
             float leftDist = length(leftDelta);
             float rightDist = length(rightDelta);
@@ -158,16 +158,16 @@ fun GhostWithMist(
             float mouthHeight = baseMouthHeight + idleWiggle * (1.0 - isSpeaking) + talkingHeight * isSpeaking;
 
             float mouthWiggle = 0.01 * sin(iTime * 1.0) * (1.0 - isSpeaking);
-            float2 mouthDelta = uv - float2(mouthWiggle, baseMouthY);
+            vec2 mouthDelta = uv - vec2(mouthWiggle, baseMouthY);
 
             // Distort the sides of the mouth
             float phase = isSpeaking > 0.0 ? iTime * 5.0 : 0.0;
             float mouthShapeWarp = 1.0 + 0.1 * sin(mouthDelta.x * 8.0 + iTime * 2.0);
 
-            float2 warpedDelta = float2(mouthDelta.x / mouthWidth, mouthDelta.y / (mouthHeight * mouthShapeWarp));
+            vec2 warpedDelta = vec2(mouthDelta.x / mouthWidth, mouthDelta.y / (mouthHeight * mouthShapeWarp));
             float mouthMask = step(length(warpedDelta), 1.0);
 
-            float mouthGradient = smoothstep(0.0, 1.0, length(float2(mouthDelta.x / mouthWidth, mouthDelta.y / mouthHeight)));
+            float mouthGradient = smoothstep(0.0, 1.0, length(vec2(mouthDelta.x / mouthWidth, mouthDelta.y / mouthHeight)));
 
             MouthData result;
             result.mask = mouthMask;
@@ -185,7 +185,7 @@ fun GhostWithMist(
         }
 
         vec2 randomPupilOffset(float baseTime) {
-            float2 randVec = vec2(
+            vec2 randVec = vec2(
                 fract(sin(baseTime * 12.9898) * 43758.5453),
                 fract(sin(baseTime * 78.233) * 96321.5487)
             );
@@ -230,18 +230,18 @@ fun GhostWithMist(
 
 
 
-        half4 main(float2 fragCoord) {
-            float2 uv = fragCoord / iResolution;
-            float2 centered = (fragCoord - 0.5 * iResolution) / min(iResolution.x, iResolution.y);
+        half4 main(vec2 fragCoord) {
+            vec2 uv = fragCoord / iResolution;
+            vec2 centered = (fragCoord - 0.5 * iResolution) / min(iResolution.x, iResolution.y);
 
             // === Floating animation ===
             float floatOffset = 0.03 * sin(iTime * 0.7);
-            float2 ghostCenterUV = float2(0.5, 0.5 + floatOffset);
+            vec2 ghostCenterUV = vec2(0.5, 0.5 + floatOffset);
 
             // === Ghost body shape with tail wave ===
-            float2 ghostUV = centered;
+            vec2 ghostUV = centered;
             ghostUV.y += floatOffset;
-            float2 faceUV = ghostUV; // Save before applying the tail wave
+            vec2 faceUV = ghostUV; // Save before applying the tail wave
             float tailWave = 0.05 * sin(ghostUV.x * 15.0 + iTime * 2.0);
             float tailFactor = smoothstep(0.0, 0.3, ghostUV.y);
             ghostUV.y += tailWave * tailFactor;
@@ -250,7 +250,7 @@ fun GhostWithMist(
 
             float radius = 0.4;
             // Stretch ghost vertically
-            float2 ellipticalUV = float2(ghostUV.x, ghostUV.y * 0.9);
+            vec2 ellipticalUV = vec2(ghostUV.x, ghostUV.y * 0.9);
             float ghostBody = smoothstep(radius, radius - 0.1, length(ellipticalUV));
 
             float ghostMask = smoothstep(0.01, 0.99, ghostBody);
@@ -266,8 +266,8 @@ fun GhostWithMist(
             vec2 pupilOffset = randomPupilOffset(moveCycle) * moveProgress * (1.0 - isBlinking);
 
             // === Eye shape and position ===
-            float2 leftEye = float2(-0.12, -0.08);
-            float2 rightEye = float2( 0.12, -0.08);
+            vec2 leftEye = vec2(-0.12, -0.08);
+            vec2 rightEye = vec2( 0.12, -0.08);
             EyeData eyes = drawEyes(faceUV, leftEye, rightEye, isBlinking);
 
             // === Pupils ===
@@ -277,10 +277,10 @@ fun GhostWithMist(
              MouthData mouth = drawMouth(faceUV, iTime, isSpeaking);
 
             // === Mist background using fbm noise ===
-            float2 mistUV = uv * 3.0 + float2(iTime * 0.08, iTime * 0.03);
+            vec2 mistUV = uv * 3.0 + vec2(iTime * 0.08, iTime * 0.03);
             float mistNoise = fbm(mistUV);
             float mistStrength = 0.5;
-            float3 mistColor = float3(0.85) * (mistNoise * mistStrength);
+            vec3 mistColor = vec3(0.85) * (mistNoise * mistStrength);
             
             // === Lightning trigger (random flash like blinking) ===
             float lightningSeed = floor(iTime * 2.0);  // check twice a second
@@ -296,9 +296,8 @@ fun GhostWithMist(
             float lightningMask = smoothstep(1.0, 0.4, uv.y);  // fades from 0 at bottom to 1 at top
             mistColor += lightning * lightningMask * vec3(0.3, 0.4, 0.5); // bluish, not white
 
-
             // === Ghost glow influence on mist ===
-            float3 ghostGlowColor = float3(0.2 + 0.4 * isSpeaking, 1.0, 0.2 + 0.4 * isSpeaking);
+            vec3 ghostGlowColor = vec3(0.2 + 0.4 * isSpeaking, 1.0, 0.2 + 0.4 * isSpeaking);
             float ghostDist = length(ghostUV);
             float glowFalloff = smoothstep(0.5, 0.0, ghostDist);
 
@@ -306,29 +305,29 @@ fun GhostWithMist(
             mistColor += ghostGlowColor * glowFalloff * 1.5;
             
             // === Ghost body shading (3D effect) ===
-            float3 ghostInnerColor = float3(0.2, 1.0, 0.2);  // bright green
-            float3 ghostEdgeColor  = float3(0.0, 0.4, 0.0);  // darker green
+            vec3 ghostInnerColor = vec3(0.2, 1.0, 0.2);  // bright green
+            vec3 ghostEdgeColor  = vec3(0.0, 0.4, 0.0);  // darker green
 
             float ghostDistFactor = smoothstep(0.0, radius, length(ghostUV));
-            float3 ghostShadedColor = mix(ghostInnerColor, ghostEdgeColor, ghostDistFactor);
+            vec3 ghostShadedColor = mix(ghostInnerColor, ghostEdgeColor, ghostDistFactor);
 
             // === Composite ghost over mist ===
-            float3 finalColor = mix(mistColor, ghostShadedColor, ghostMask);
+            vec3 finalColor = mix(mistColor, ghostShadedColor, ghostMask);
 
             if (eyes.mask > 0.0) {
                 // Brighter edge for more contrast — like a recessed socket
-                float3 eyeOuterColor = float3(0.20, 0.3, 0.20); // shadowy green-gray
-                float3 eyeInnerColor = float3(0.0);   // black center
+                vec3 eyeOuterColor = vec3(0.20, 0.3, 0.20); // shadowy green-gray
+                vec3 eyeInnerColor = vec3(0.0);   // black center
 
-                float3 eyeGradientColor = mix(eyeInnerColor, eyeOuterColor, eyes.gradient);
+                vec3 eyeGradientColor = mix(eyeInnerColor, eyeOuterColor, eyes.gradient);
                 finalColor = mix(finalColor, eyeGradientColor, eyes.mask);
             }
 
            if (pupils.mask > 0.0) {
-               float3 pupilOuterColor = getOutterPupilEmotionColor();                
-               float3 pupilCenterColor = getInnerPupilEmotionColor();
+               vec3 pupilOuterColor = getOutterPupilEmotionColor();
+               vec3 pupilCenterColor = getInnerPupilEmotionColor();
 
-               float3 pupilColor = mix(pupilOuterColor, pupilCenterColor, pupils.gradient);
+               vec3 pupilColor = mix(pupilOuterColor, pupilCenterColor, pupils.gradient);
                finalColor = mix(finalColor, pupilColor, pupils.mask);
            }
 
@@ -337,9 +336,9 @@ fun GhostWithMist(
             float finalAlpha = mix(1.0, ghostMask * alphaFade, ghostMask);
 
             if (mouth.mask > 0.0) {
-                float3 mouthOuterColor = float3(0.2, 0.3, 0.2);
-                float3 mouthInnerColor = float3(0.0);
-                float3 mouthColor = mix(mouthInnerColor, mouthOuterColor, mouth.gradient);
+                vec3 mouthOuterColor = vec3(0.2, 0.3, 0.2);
+                vec3 mouthInnerColor = vec3(0.0);
+                vec3 mouthColor = mix(mouthInnerColor, mouthOuterColor, mouth.gradient);
                 finalColor = mix(finalColor, mouthColor, mouth.mask);
             }
 
