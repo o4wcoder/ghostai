@@ -39,19 +39,8 @@ constructor(
     private var isRecoveringRecognizer = false
     private val userInputChannel = Channel<UserInput>(Channel.UNLIMITED)
     private val ghostResponseChannel = Channel<GhostReply>(Channel.UNLIMITED)
-    // private val _conversationState = MutableStateFlow(ConversationState.Idle)
-    // private val conversationState: StateFlow<ConversationState> = _conversationState.asStateFlow()
-
-    private val _ghostUiState = MutableStateFlow(GhostUiState(ConversationState.Idle, Emotion.Neutral))
+    private val _ghostUiState = MutableStateFlow(GhostUiState.default())
     val ghostUiState: StateFlow<GhostUiState> = _ghostUiState.asStateFlow()
-//    val uiModel: StateFlow<GhostUiState> = combine(_conversationState) {
-//        val conversationState = it[0]
-//        GhostUiState(conversationState, Emotion.Neutral)
-//    }
-//        .collect()
-//        _conversationState
-//            .map { it == ConversationState.GhostTalking }
-//            .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     init {
         tts =
@@ -209,8 +198,12 @@ constructor(
         speechRecognizerManager?.destroy()
     }
 
-    private fun updateGhostEmotion(emotion: Emotion) {
-        _ghostUiState.value = _ghostUiState.value.copy(emotion = emotion)
+    private fun updateGhostEmotion(newEmotion: Emotion) {
+        val currentTarget = _ghostUiState.value.targetEmotion
+        _ghostUiState.value = _ghostUiState.value.copy(
+            startEmotion = currentTarget,
+            targetEmotion = newEmotion,
+        )
     }
 
     private fun updateConversationState(state: ConversationState) {

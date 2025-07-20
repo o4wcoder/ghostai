@@ -24,6 +24,7 @@ import com.example.ghostai.model.GhostUiState
 import com.example.ghostai.oldui.rememberStableTime
 import com.example.ghostai.ui.theme.GhostAITheme
 import com.example.ghostai.util.pointerTapEvents
+import com.example.ghostai.util.rememberEmotionTransitionState
 import org.intellij.lang.annotations.Language
 import timber.log.Timber
 
@@ -39,7 +40,9 @@ fun GhostWithMist(
         uniform vec2 iResolution;
         uniform float iTime;
         uniform float isSpeaking;
-        uniform float uEmotion;
+        uniform float uStartEmotion;
+        uniform float uTargetEmotion;
+        uniform float uEmotionProgress;
 
         struct EyeData {
             float mask;
@@ -195,32 +198,32 @@ fun GhostWithMist(
         }
 
         // Example: setting a color based on emotion
-        vec3 getInnerPupilEmotionColor() {
-            if (uEmotion == 1.0) {         // Angry
+        vec3 getInnerPupilEmotionColor(float emotionId) {
+            if (emotionId == 1.0) {         // Angry
                 return vec3(1.0, 0.4, 0.4);    // Bright red-pink
-            } else if (uEmotion == 2.0) {  // Happy
+            } else if (emotionId == 2.0) {  // Happy
                 return vec3(1.0, 1.0, 0.5);    // Soft yellow
-            } else if (uEmotion == 3.0) {  // Sad
+            } else if (emotionId == 3.0) {  // Sad
                 return vec3(0.4, 0.4, 1.0);    // Soft blue
-            } else if (uEmotion == 4.0) {  // Spooky
+            } else if (emotionId == 4.0) {  // Spooky
                 return vec3(0.6, 0.9, 0.6);    // Pale green (ghostly)
-            } else if (uEmotion == 5.0) {  // Funny
+            } else if (emotionId == 5.0) {  // Funny
                 return vec3(1.0, 0.6, 1.0);    // Pinkish
             } else {                        // Neutral (default)
                 return vec3(0.6, 0.9, 0.6);    // Pale green (neutral)
             }
         }
 
-        vec3 getOutterPupilEmotionColor() {
-            if (uEmotion == 1.0) {         // Angry
+        vec3 getOutterPupilEmotionColor(float emotionId) {
+            if (emotionId == 1.0) {         // Angry
                 return vec3(0.3, 0.0, 0.0);    // Dark red
-            } else if (uEmotion == 2.0) {  // Happy
+            } else if (emotionId == 2.0) {  // Happy
                 return vec3(0.4, 0.4, 0.0);    // Olive yellow
-            } else if (uEmotion == 3.0) {  // Sad
+            } else if (emotionId == 3.0) {  // Sad
                 return vec3(0.0, 0.0, 0.3);    // Dark blue
-            } else if (uEmotion == 4.0) {  // Spooky
+            } else if (emotionId == 4.0) {  // Spooky
                 return vec3(0.0, 0.3, 0.0);    // Dark green
-            } else if (uEmotion == 5.0) {  // Funny
+            } else if (emotionId == 5.0) {  // Funny
                 return vec3(0.3, 0.0, 0.3);    // Dark magenta
             } else {                        // Neutral (default)
                 return vec3(0.063, 0.302, 0.063);  // Dark green (neutral)
@@ -323,13 +326,24 @@ fun GhostWithMist(
                 finalColor = mix(finalColor, eyeGradientColor, eyes.mask);
             }
 
-           if (pupils.mask > 0.0) {
-               vec3 pupilOuterColor = getOutterPupilEmotionColor();
-               vec3 pupilCenterColor = getInnerPupilEmotionColor();
+          if (pupils.mask > 0.0) {
+              // Colors for START emotion
+              vec3 startOuterColor = getOutterPupilEmotionColor(uStartEmotion);
+              vec3 startInnerColor = getInnerPupilEmotionColor(uStartEmotion);
+              vec3 startBlendedColor = mix(startOuterColor, startInnerColor, pupils.gradient);
 
-               vec3 pupilColor = mix(pupilOuterColor, pupilCenterColor, pupils.gradient);
-               finalColor = mix(finalColor, pupilColor, pupils.mask);
-           }
+              // Colors for TARGET emotion
+              vec3 targetOuterColor = getOutterPupilEmotionColor(uTargetEmotion);
+              vec3 targetInnerColor = getInnerPupilEmotionColor(uTargetEmotion);
+              vec3 targetBlendedColor = mix(targetOuterColor, targetInnerColor, pupils.gradient);
+
+              // Smooth transition from start to target based on uEmotionProgress
+              vec3 pupilColor = mix(startBlendedColor, targetBlendedColor, uEmotionProgress);
+
+              // Apply pupil color to final image
+              finalColor = mix(finalColor, pupilColor, pupils.mask);
+          }
+
 
             // === Alpha fade at ghost edges ===
             float alphaFade = smoothstep(radius, radius - 0.05, length(ellipticalUV));
@@ -355,12 +369,20 @@ fun GhostWithMist(
         animationSpec = tween(durationMillis = 300),
     )
 
+    val emotionTransitionState = rememberEmotionTransitionState()
+
+    LaunchedEffect(ghostUiState.targetEmotion) {
+        emotionTransitionState.transitionTo(ghostUiState.targetEmotion)
+    }
+
     var canvasSize by remember { mutableStateOf(Size(1f, 1f)) }
 
-    LaunchedEffect(time, ghostUiState, canvasSize) {
+    LaunchedEffect(time, ghostUiState, canvasSize, animatedSpeaking, emotionTransitionState.emotionProgress) {
         shader.setFloatUniform("iTime", time)
         shader.setFloatUniform("isSpeaking", animatedSpeaking)
-        shader.setFloatUniform("uEmotion", ghostUiState.emotion.id)
+        shader.setFloatUniform("uEmotionProgress", emotionTransitionState.emotionProgress)
+        shader.setFloatUniform("uStartEmotion", emotionTransitionState.startEmotion.id)
+        shader.setFloatUniform("uTargetEmotion", emotionTransitionState.targetEmotion.id)
         shader.setFloatUniform("iResolution", canvasSize.width, canvasSize.height)
     }
 
@@ -379,6 +401,9 @@ fun GhostWithMist(
         canvasSize = size
         shader.setFloatUniform("iTime", time)
         shader.setFloatUniform("isSpeaking", animatedSpeaking)
+        shader.setFloatUniform("uEmotionProgress", emotionTransitionState.emotionProgress)
+        shader.setFloatUniform("uStartEmotion", emotionTransitionState.startEmotion.id.toFloat())
+        shader.setFloatUniform("uTargetEmotion", emotionTransitionState.targetEmotion.id.toFloat())
         shader.setFloatUniform("iResolution", size.width, size.height)
 
         drawRect(
@@ -401,14 +426,16 @@ fun GhostWithMistPreview() {
 @Composable
 fun GhostWithMistAngryEmotionPreview() {
     GhostAITheme {
-        GhostWithMist(ghostUiState = getGhostUiStatePreviewUiState(emotion = Emotion.Angry), time = 2.0F, modifier = Modifier.background(Color.Black), onGhostThouched = {})
+        GhostWithMist(ghostUiState = getGhostUiStatePreviewUiState(targetEmotion = Emotion.Angry), time = 2.0F, modifier = Modifier.background(Color.Black), onGhostThouched = {})
     }
 }
 
 fun getGhostUiStatePreviewUiState(
     conversationState: ConversationState = ConversationState.GhostTalking,
-    emotion: Emotion = Emotion.Neutral,
+    startEmotion: Emotion = Emotion.Neutral,
+    targetEmotion: Emotion = Emotion.Neutral,
 ) = GhostUiState(
     conversationState = conversationState,
-    emotion = emotion,
+    startEmotion = startEmotion,
+    targetEmotion = targetEmotion,
 )
