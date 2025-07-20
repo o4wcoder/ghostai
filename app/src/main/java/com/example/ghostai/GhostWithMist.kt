@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -23,10 +22,9 @@ import com.example.ghostai.model.Emotion
 import com.example.ghostai.model.GhostUiState
 import com.example.ghostai.oldui.rememberStableTime
 import com.example.ghostai.ui.theme.GhostAITheme
-import com.example.ghostai.util.ShaderTransitionState
 import com.example.ghostai.util.pointerTapEvents
+import com.example.ghostai.util.rememberShaderTransitionState
 import org.intellij.lang.annotations.Language
-import timber.log.Timber
 
 @Composable
 fun GhostWithMist(
@@ -369,35 +367,16 @@ fun GhostWithMist(
         animationSpec = tween(durationMillis = 300),
     )
 
-    val emotionTransitionState = remember {
-        ShaderTransitionState(
-            initialState = Emotion.Neutral,
-        ) { start, target ->
-            shader.setFloatUniform("uStartState", start.id)
-            shader.setFloatUniform("uTargetState", target.id)
-        }
-    }
+    val emotionTransitionState = rememberShaderTransitionState(initialState = Emotion.Neutral)
 
     LaunchedEffect(ghostUiState.targetEmotion) {
         emotionTransitionState.transitionTo(ghostUiState.targetEmotion)
-    }
-
-    var canvasSize by remember { mutableStateOf(Size(1f, 1f)) }
-
-    LaunchedEffect(time, ghostUiState, canvasSize, animatedSpeaking, emotionTransitionState.transitionProgress) {
-        shader.setFloatUniform("iTime", time)
-        shader.setFloatUniform("isSpeaking", animatedSpeaking)
-        shader.setFloatUniform("uTransitionProgress", emotionTransitionState.transitionProgress)
-        shader.setFloatUniform("uStartState", emotionTransitionState.startState.id)
-        shader.setFloatUniform("uTargetState", emotionTransitionState.targetState.id)
-        shader.setFloatUniform("iResolution", canvasSize.width, canvasSize.height)
     }
 
     Canvas(
         modifier = modifier.fillMaxSize()
             .pointerTapEvents(
                 onTap = {
-                    Timber.d("CGH: onGhostTouched()")
                     onGhostThouched()
                 },
                 onDoubleTap = {
@@ -405,7 +384,6 @@ fun GhostWithMist(
             ),
 
     ) {
-        canvasSize = size
         shader.setFloatUniform("iTime", time)
         shader.setFloatUniform("isSpeaking", animatedSpeaking)
         shader.setFloatUniform("uTransitionProgress", emotionTransitionState.transitionProgress)

@@ -2,7 +2,24 @@ package com.example.ghostai.util
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.remember
+
+@Composable
+fun <T> rememberShaderTransitionState(
+    initialState: T,
+    durationMillis: Int = 800,
+    onStateChange: (start: T, target: T) -> Unit = { _, _ -> },
+): ShaderTransitionState<T> {
+    return remember {
+        ShaderTransitionState(
+            initialState = initialState,
+            durationMillis = durationMillis,
+            onStateChange = onStateChange,
+        )
+    }
+}
 
 @Stable
 class ShaderTransitionState<T>(
