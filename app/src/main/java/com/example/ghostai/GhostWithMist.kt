@@ -24,6 +24,7 @@ import com.example.ghostai.oldui.rememberStableTime
 import com.example.ghostai.ui.theme.GhostAITheme
 import com.example.ghostai.util.pointerTapEvents
 import com.example.ghostai.util.rememberShaderTransitionState
+import com.example.ghostai.util.rememberStableTime
 import org.intellij.lang.annotations.Language
 
 @Composable

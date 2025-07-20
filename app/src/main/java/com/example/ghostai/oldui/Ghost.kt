@@ -14,12 +14,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
@@ -29,6 +27,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.ghostai.R
+import com.example.ghostai.util.rememberStableTime
 
 @Composable
 fun Ghost(modifier: Modifier = Modifier) {
@@ -48,22 +47,6 @@ fun Ghost(modifier: Modifier = Modifier) {
             },
         )
     }
-}
-
-@Composable
-fun rememberStableTime(): Float {
-    var timeSeconds by remember { mutableStateOf(0f) }
-
-    LaunchedEffect(Unit) {
-        val startTime = withFrameNanos { it }
-        while (true) {
-            val now = withFrameNanos { it }
-            val elapsedNanos = now - startTime
-            timeSeconds = elapsedNanos / 1_000_000_000f
-        }
-    }
-
-    return timeSeconds
 }
 
 @Composable
