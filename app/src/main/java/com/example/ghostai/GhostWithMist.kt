@@ -23,8 +23,8 @@ import com.example.ghostai.model.Emotion
 import com.example.ghostai.model.GhostUiState
 import com.example.ghostai.oldui.rememberStableTime
 import com.example.ghostai.ui.theme.GhostAITheme
+import com.example.ghostai.util.ShaderTransitionState
 import com.example.ghostai.util.pointerTapEvents
-import com.example.ghostai.util.rememberEmotionTransitionState
 import org.intellij.lang.annotations.Language
 import timber.log.Timber
 
@@ -40,9 +40,9 @@ fun GhostWithMist(
         uniform vec2 iResolution;
         uniform float iTime;
         uniform float isSpeaking;
-        uniform float uStartEmotion;
-        uniform float uTargetEmotion;
-        uniform float uEmotionProgress;
+        uniform float uStartState;
+        uniform float uTargetState;
+        uniform float uTransitionProgress;
 
         struct EyeData {
             float mask;
@@ -328,17 +328,17 @@ fun GhostWithMist(
 
           if (pupils.mask > 0.0) {
               // Colors for START emotion
-              vec3 startOuterColor = getOutterPupilEmotionColor(uStartEmotion);
-              vec3 startInnerColor = getInnerPupilEmotionColor(uStartEmotion);
+              vec3 startOuterColor = getOutterPupilEmotionColor(uStartState);
+              vec3 startInnerColor = getInnerPupilEmotionColor(uStartState);
               vec3 startBlendedColor = mix(startOuterColor, startInnerColor, pupils.gradient);
 
               // Colors for TARGET emotion
-              vec3 targetOuterColor = getOutterPupilEmotionColor(uTargetEmotion);
-              vec3 targetInnerColor = getInnerPupilEmotionColor(uTargetEmotion);
+              vec3 targetOuterColor = getOutterPupilEmotionColor(uTargetState);
+              vec3 targetInnerColor = getInnerPupilEmotionColor(uTargetState);
               vec3 targetBlendedColor = mix(targetOuterColor, targetInnerColor, pupils.gradient);
 
-              // Smooth transition from start to target based on uEmotionProgress
-              vec3 pupilColor = mix(startBlendedColor, targetBlendedColor, uEmotionProgress);
+              // Smooth transition from start to target based on uTransitionProgress
+              vec3 pupilColor = mix(startBlendedColor, targetBlendedColor, uTransitionProgress);
 
               // Apply pupil color to final image
               finalColor = mix(finalColor, pupilColor, pupils.mask);
@@ -369,7 +369,14 @@ fun GhostWithMist(
         animationSpec = tween(durationMillis = 300),
     )
 
-    val emotionTransitionState = rememberEmotionTransitionState()
+    val emotionTransitionState = remember {
+        ShaderTransitionState(
+            initialState = Emotion.Neutral,
+        ) { start, target ->
+            shader.setFloatUniform("uStartState", start.id)
+            shader.setFloatUniform("uTargetState", target.id)
+        }
+    }
 
     LaunchedEffect(ghostUiState.targetEmotion) {
         emotionTransitionState.transitionTo(ghostUiState.targetEmotion)
@@ -377,12 +384,12 @@ fun GhostWithMist(
 
     var canvasSize by remember { mutableStateOf(Size(1f, 1f)) }
 
-    LaunchedEffect(time, ghostUiState, canvasSize, animatedSpeaking, emotionTransitionState.emotionProgress) {
+    LaunchedEffect(time, ghostUiState, canvasSize, animatedSpeaking, emotionTransitionState.transitionProgress) {
         shader.setFloatUniform("iTime", time)
         shader.setFloatUniform("isSpeaking", animatedSpeaking)
-        shader.setFloatUniform("uEmotionProgress", emotionTransitionState.emotionProgress)
-        shader.setFloatUniform("uStartEmotion", emotionTransitionState.startEmotion.id)
-        shader.setFloatUniform("uTargetEmotion", emotionTransitionState.targetEmotion.id)
+        shader.setFloatUniform("uTransitionProgress", emotionTransitionState.transitionProgress)
+        shader.setFloatUniform("uStartState", emotionTransitionState.startState.id)
+        shader.setFloatUniform("uTargetState", emotionTransitionState.targetState.id)
         shader.setFloatUniform("iResolution", canvasSize.width, canvasSize.height)
     }
 
@@ -401,9 +408,9 @@ fun GhostWithMist(
         canvasSize = size
         shader.setFloatUniform("iTime", time)
         shader.setFloatUniform("isSpeaking", animatedSpeaking)
-        shader.setFloatUniform("uEmotionProgress", emotionTransitionState.emotionProgress)
-        shader.setFloatUniform("uStartEmotion", emotionTransitionState.startEmotion.id.toFloat())
-        shader.setFloatUniform("uTargetEmotion", emotionTransitionState.targetEmotion.id.toFloat())
+        shader.setFloatUniform("uTransitionProgress", emotionTransitionState.transitionProgress)
+        shader.setFloatUniform("uStartState", emotionTransitionState.startState.id)
+        shader.setFloatUniform("uTargetState", emotionTransitionState.targetState.id)
         shader.setFloatUniform("iResolution", size.width, size.height)
 
         drawRect(
