@@ -8,16 +8,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
+import com.example.ghostai.model.GhostUiState
 import com.example.ghostai.ui.theme.GhostAITheme
 
 @Composable
 fun MainScreen(
-    isSpeaking: Boolean,
+    ghostUiState: GhostUiState,
     onGhostTouched: () -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         GhostWithMist(
-            isSpeaking = isSpeaking,
+            ghostUiState = ghostUiState,
             onGhostThouched = onGhostTouched,
             modifier = Modifier.align(Alignment.Center),
         )
@@ -28,6 +29,6 @@ fun MainScreen(
 @Composable
 private fun PreviewMainScreen() {
     GhostAITheme {
-        MainScreen(false, onGhostTouched = {})
+        MainScreen(ghostUiState = getGhostUiStatePreviewUiState(), onGhostTouched = {})
     }
 }

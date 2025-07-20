@@ -52,7 +52,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             GhostAITheme {
                 val ghostUiState by viewModel.ghostUiState.collectAsStateWithLifecycle()
-                MainScreen(isSpeaking = ghostUiState.isSpeaking, onGhostTouched = {
+                MainScreen(ghostUiState = ghostUiState, onGhostTouched = {
                     viewModel.onGhostTouched()
                 })
             }
@@ -88,6 +88,6 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun GreetingPreview() {
     GhostAITheme {
-        MainScreen(false, onGhostTouched = {})
+        MainScreen(getGhostUiStatePreviewUiState(), onGhostTouched = {})
     }
 }

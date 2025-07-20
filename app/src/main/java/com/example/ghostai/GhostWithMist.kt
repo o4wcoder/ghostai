@@ -18,6 +18,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shader
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.tooling.preview.Preview
+import com.example.ghostai.model.ConversationState
+import com.example.ghostai.model.Emotion
+import com.example.ghostai.model.GhostUiState
 import com.example.ghostai.oldui.rememberStableTime
 import com.example.ghostai.ui.theme.GhostAITheme
 import com.example.ghostai.util.pointerTapEvents
@@ -26,7 +29,7 @@ import timber.log.Timber
 
 @Composable
 fun GhostWithMist(
-    isSpeaking: Boolean,
+    ghostUiState: GhostUiState,
     modifier: Modifier = Modifier,
     onGhostThouched: () -> Unit,
     time: Float = rememberStableTime(),
@@ -36,6 +39,7 @@ fun GhostWithMist(
         uniform float2 iResolution;
         uniform float iTime;
         uniform float isSpeaking;
+        uniform float uEmotion;
 
         struct EyeData {
             float mask;
@@ -190,6 +194,41 @@ fun GhostWithMist(
             return vec2(cos(angle), sin(angle)) * radius;
         }
 
+        // Example: setting a color based on emotion
+        vec3 getInnerPupilEmotionColor() {
+            if (uEmotion == 1.0) {         // Angry
+                return vec3(1.0, 0.4, 0.4);    // Bright red-pink
+            } else if (uEmotion == 2.0) {  // Happy
+                return vec3(1.0, 1.0, 0.5);    // Soft yellow
+            } else if (uEmotion == 3.0) {  // Sad
+                return vec3(0.4, 0.4, 1.0);    // Soft blue
+            } else if (uEmotion == 4.0) {  // Spooky
+                return vec3(0.6, 0.9, 0.6);    // Pale green (ghostly)
+            } else if (uEmotion == 5.0) {  // Funny
+                return vec3(1.0, 0.6, 1.0);    // Pinkish
+            } else {                        // Neutral (default)
+                return vec3(0.6, 0.9, 0.6);    // Pale green (neutral)
+            }
+        }
+
+        vec3 getOutterPupilEmotionColor() {
+            if (uEmotion == 1.0) {         // Angry
+                return vec3(0.3, 0.0, 0.0);    // Dark red
+            } else if (uEmotion == 2.0) {  // Happy
+                return vec3(0.4, 0.4, 0.0);    // Olive yellow
+            } else if (uEmotion == 3.0) {  // Sad
+                return vec3(0.0, 0.0, 0.3);    // Dark blue
+            } else if (uEmotion == 4.0) {  // Spooky
+                return vec3(0.0, 0.3, 0.0);    // Dark green
+            } else if (uEmotion == 5.0) {  // Funny
+                return vec3(0.3, 0.0, 0.3);    // Dark magenta
+            } else {                        // Neutral (default)
+                return vec3(0.063, 0.302, 0.063);  // Dark green (neutral)
+            }
+        }
+
+
+
 
         half4 main(float2 fragCoord) {
             float2 uv = fragCoord / iResolution;
@@ -286,8 +325,8 @@ fun GhostWithMist(
             }
 
            if (pupils.mask > 0.0) {
-               float3 pupilOuterColor = float3(0.063, 0.302, 0.063);
-               float3 pupilCenterColor = float3(0.6, 0.9, 0.6);
+               float3 pupilOuterColor = getOutterPupilEmotionColor();                
+               float3 pupilCenterColor = getInnerPupilEmotionColor();
 
                float3 pupilColor = mix(pupilOuterColor, pupilCenterColor, pupils.gradient);
                finalColor = mix(finalColor, pupilColor, pupils.mask);
@@ -313,15 +352,16 @@ fun GhostWithMist(
     }
 
     val animatedSpeaking by animateFloatAsState(
-        targetValue = if (isSpeaking) 1f else 0f,
+        targetValue = if (ghostUiState.isSpeaking) 1f else 0f,
         animationSpec = tween(durationMillis = 300),
     )
 
     var canvasSize by remember { mutableStateOf(Size(1f, 1f)) }
 
-    LaunchedEffect(time, isSpeaking, canvasSize) {
+    LaunchedEffect(time, ghostUiState, canvasSize) {
         shader.setFloatUniform("iTime", time)
         shader.setFloatUniform("isSpeaking", animatedSpeaking)
+        shader.setFloatUniform("uEmotion", ghostUiState.emotion.id)
         shader.setFloatUniform("iResolution", canvasSize.width, canvasSize.height)
     }
 
@@ -354,6 +394,22 @@ fun GhostWithMist(
 @Composable
 fun GhostWithMistPreview() {
     GhostAITheme {
-        GhostWithMist(isSpeaking = true, time = 2.0F, modifier = Modifier.background(Color.Black), onGhostThouched = {})
+        GhostWithMist(ghostUiState = getGhostUiStatePreviewUiState(), time = 2.0F, modifier = Modifier.background(Color.Black), onGhostThouched = {})
     }
 }
+
+@Preview(showBackground = true)
+@Composable
+fun GhostWithMistAngryEmotionPreview() {
+    GhostAITheme {
+        GhostWithMist(ghostUiState = getGhostUiStatePreviewUiState(emotion = Emotion.Angry), time = 2.0F, modifier = Modifier.background(Color.Black), onGhostThouched = {})
+    }
+}
+
+fun getGhostUiStatePreviewUiState(
+    conversationState: ConversationState = ConversationState.GhostTalking,
+    emotion: Emotion = Emotion.Neutral,
+) = GhostUiState(
+    conversationState = conversationState,
+    emotion = emotion,
+)
