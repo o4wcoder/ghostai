@@ -11,6 +11,7 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import kotlinx.serialization.Serializable
+import java.util.Locale
 
 private val LLM_MODEL = "gpt-4o"
 
@@ -44,17 +45,17 @@ class OpenAIService(
 ) {
 
     suspend fun getGhostReply(userPrompt: UserInput): GhostReply {
-        val (messages, emotion) = when (userPrompt) {
+        val messages = when (userPrompt) {
             is UserInput.Voice -> {
                 listOf(
-                    ChatMessage("system", "You are a curious ghost named Whisper who haunts a foggy glade and is mischievous. Keep your responses brief, spooky, witty, sarcastic — no more than one or two sentences."),
+                    ChatMessage("system", GHOST_BACK_STORY_SYSTEM_PROMPT),
                     ChatMessage("user", userPrompt.text),
-                ) to Emotion.Neutral
+                )
             }
             is UserInput.Touch -> {
                 listOf(
-                    ChatMessage("system", "You are a ghost who has been disturbed by the user's touch. Respond in an angry, spooky manner, perhaps with a threat or eerie warning. Make responses short"),
-                ) to Emotion.Angry
+                    ChatMessage("system", GHOST_ANGRY_PROMPT),
+                )
             }
         }
 
@@ -78,6 +79,25 @@ class OpenAIService(
             "A chill runs down my circuits... something went wrong!"
         }
 
-        return GhostReply(emotion, replyText.trim())
+        return parseEmotionTag(replyText.trim())
+    }
+}
+
+fun parseEmotionTag(rawText: String): GhostReply {
+    val regex = Regex("""^\[Emotion:\s*(\w+)]\s*(.*)""", RegexOption.IGNORE_CASE)
+    val match = regex.find(rawText)
+
+    return if (match != null) {
+        val emotionName = match.groupValues[1].trim().capitalize(Locale.ROOT)
+        val message = match.groupValues[2].trim()
+
+        val emotion = Emotion.entries.firstOrNull {
+            it.name.equals(emotionName, ignoreCase = true)
+        } ?: Emotion.Neutral
+
+        GhostReply(emotion, message)
+    } else {
+        // Fallback if the emotion tag is missing
+        GhostReply(Emotion.Neutral, rawText.trim())
     }
 }

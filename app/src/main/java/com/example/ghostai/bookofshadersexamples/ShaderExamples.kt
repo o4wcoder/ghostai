@@ -14,8 +14,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Shader
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.tooling.preview.Preview
-import com.example.ghostai.oldui.rememberStableTime
 import com.example.ghostai.ui.theme.GhostAITheme
+import com.example.ghostai.util.rememberStableTime
 import org.intellij.lang.annotations.Language
 
 @Composable

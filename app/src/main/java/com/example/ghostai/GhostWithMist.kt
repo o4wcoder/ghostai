@@ -20,7 +20,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.example.ghostai.model.ConversationState
 import com.example.ghostai.model.Emotion
 import com.example.ghostai.model.GhostUiState
-import com.example.ghostai.oldui.rememberStableTime
 import com.example.ghostai.ui.theme.GhostAITheme
 import com.example.ghostai.util.pointerTapEvents
 import com.example.ghostai.util.rememberShaderTransitionState
@@ -228,9 +227,6 @@ fun GhostWithMist(
                 return vec3(0.063, 0.302, 0.063);  // Dark green (neutral)
             }
         }
-
-
-
 
         half4 main(vec2 fragCoord) {
             vec2 uv = fragCoord / iResolution;
