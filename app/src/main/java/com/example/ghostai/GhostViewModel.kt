@@ -10,10 +10,13 @@ import com.example.ghostai.model.Emotion
 import com.example.ghostai.model.GhostReply
 import com.example.ghostai.model.GhostUiState
 import com.example.ghostai.model.UserInput
+import com.example.ghostai.service.AssistantMessage
 import com.example.ghostai.service.ChatMessage
 import com.example.ghostai.service.ElevenLabsService
 import com.example.ghostai.service.GHOST_ANGRY_PROMPT
 import com.example.ghostai.service.OpenAIService
+import com.example.ghostai.service.SystemMessage
+import com.example.ghostai.service.UserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -27,6 +30,8 @@ import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.util.Locale
 import javax.inject.Inject
+
+const val MAX_NUM_MESSAGES = 30
 
 @HiltViewModel
 class GhostViewModel
@@ -226,17 +231,34 @@ constructor(
     fun addUserMessage(userInput: UserInput) {
         when (userInput) {
             is UserInput.Voice -> conversationHistory.add(
-                ChatMessage(
-                    role = "user",
-                    content = userInput.text,
+                UserMessage(
+                    userInput.text,
                 ),
             )
 
-            is UserInput.Touch -> conversationHistory.add(ChatMessage("system", GHOST_ANGRY_PROMPT))
+            is UserInput.Touch -> conversationHistory.add(SystemMessage(GHOST_ANGRY_PROMPT))
         }
     }
 
     fun addGhostReply(reply: GhostReply) {
-        conversationHistory.add(ChatMessage(role = "assistant", content = reply.text))
+        conversationHistory.add(AssistantMessage(content = reply.text))
+        summarizeConversationIfNeeded()
+    }
+
+    // TODO: This is being called twice in a row
+    fun summarizeConversationIfNeeded() {
+        if (conversationHistory.size <= MAX_NUM_MESSAGES) return
+
+        val toSummarize = conversationHistory.take(MAX_NUM_MESSAGES / 2)
+        val summarizePrompt = listOf(SystemMessage("Summarize this conversation between a ghost and a user.")) + toSummarize
+
+        viewModelScope.launch {
+            val summary = openAIService.getGhostReply(summarizePrompt)
+            Timber.d("CGH: summary: ${summary.text}")
+            val remaining = conversationHistory.drop(toSummarize.size)
+            conversationHistory.clear()
+            conversationHistory.add(AssistantMessage(content = "Earlier in the conversation: ${summary.text}"))
+            conversationHistory.addAll(remaining)
+        }
     }
 }

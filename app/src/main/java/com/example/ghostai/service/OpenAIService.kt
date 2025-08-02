@@ -13,13 +13,7 @@ import kotlinx.serialization.Serializable
 import timber.log.Timber
 import java.util.Locale
 
-private val LLM_MODEL = "gpt-4o"
-
-@Serializable
-data class ChatMessage(
-    val role: String,
-    val content: String,
-)
+private const val LLM_MODEL = "gpt-4o"
 
 @Serializable
 data class ChatCompletionRequest(
@@ -46,7 +40,7 @@ class OpenAIService(
 
     suspend fun getGhostReply(conversationHistory: List<ChatMessage>): GhostReply {
         val messages = listOf(
-            ChatMessage("system", GHOST_BACK_STORY_SYSTEM_PROMPT),
+            SystemMessage(GHOST_BACK_STORY_SYSTEM_PROMPT),
         ) + conversationHistory
 
         Timber.d("CGH: size of messages = ${messages.count()}")
