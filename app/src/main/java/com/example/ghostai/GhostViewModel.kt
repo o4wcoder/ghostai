@@ -10,7 +10,9 @@ import com.example.ghostai.model.Emotion
 import com.example.ghostai.model.GhostReply
 import com.example.ghostai.model.GhostUiState
 import com.example.ghostai.model.UserInput
+import com.example.ghostai.service.ChatMessage
 import com.example.ghostai.service.ElevenLabsService
+import com.example.ghostai.service.GHOST_ANGRY_PROMPT
 import com.example.ghostai.service.OpenAIService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -42,6 +44,8 @@ constructor(
     private val _ghostUiState = MutableStateFlow(GhostUiState.default())
     val ghostUiState: StateFlow<GhostUiState> = _ghostUiState.asStateFlow()
 
+    var conversationHistory = mutableListOf<ChatMessage>()
+
     init {
         tts =
             TextToSpeech(application) { status ->
@@ -57,7 +61,8 @@ constructor(
     private fun observeUserInputQueue() {
         viewModelScope.launch {
             for (input in userInputChannel) {
-                val openAiResponse = openAIService.getGhostReply(input)
+                addUserMessage(input)
+                val openAiResponse = openAIService.getGhostReply(conversationHistory)
                 ghostResponseChannel.send(openAiResponse)
             }
         }
@@ -69,6 +74,7 @@ constructor(
                 withContext(Dispatchers.Main) {
                     stopListening()
 
+                    addGhostReply(reply)
                     updateGhostEmotion(reply.emotion)
                     elevenLabsService.startStreamingSpeech(
                         text = reply.text,
@@ -215,5 +221,22 @@ constructor(
     private fun updateConversationState(state: ConversationState) {
         Timber.d("CGH: updateConversationState @ ${System.currentTimeMillis()} - state ${_ghostUiState.value.conversationState}")
         _ghostUiState.update { it.copy(conversationState = state) }
+    }
+
+    fun addUserMessage(userInput: UserInput) {
+        when (userInput) {
+            is UserInput.Voice -> conversationHistory.add(
+                ChatMessage(
+                    role = "user",
+                    content = userInput.text,
+                ),
+            )
+
+            is UserInput.Touch -> conversationHistory.add(ChatMessage("system", GHOST_ANGRY_PROMPT))
+        }
+    }
+
+    fun addGhostReply(reply: GhostReply) {
+        conversationHistory.add(ChatMessage(role = "assistant", content = reply.text))
     }
 }

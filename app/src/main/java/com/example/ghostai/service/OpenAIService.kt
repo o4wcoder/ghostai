@@ -2,7 +2,6 @@ package com.example.ghostai.service
 
 import com.example.ghostai.model.Emotion
 import com.example.ghostai.model.GhostReply
-import com.example.ghostai.model.UserInput
 import com.example.ghostai.network.ktorHttpClient
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -11,6 +10,7 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import kotlinx.serialization.Serializable
+import timber.log.Timber
 import java.util.Locale
 
 private val LLM_MODEL = "gpt-4o"
@@ -44,21 +44,12 @@ class OpenAIService(
     private val client: HttpClient = ktorHttpClient(),
 ) {
 
-    suspend fun getGhostReply(userPrompt: UserInput): GhostReply {
-        val messages = when (userPrompt) {
-            is UserInput.Voice -> {
-                listOf(
-                    ChatMessage("system", GHOST_BACK_STORY_SYSTEM_PROMPT),
-                    ChatMessage("user", userPrompt.text),
-                )
-            }
-            is UserInput.Touch -> {
-                listOf(
-                    ChatMessage("system", GHOST_ANGRY_PROMPT),
-                )
-            }
-        }
+    suspend fun getGhostReply(conversationHistory: List<ChatMessage>): GhostReply {
+        val messages = listOf(
+            ChatMessage("system", GHOST_BACK_STORY_SYSTEM_PROMPT),
+        ) + conversationHistory
 
+        Timber.d("CGH: size of messages = ${messages.count()}")
         val request = ChatCompletionRequest(
             model = LLM_MODEL,
             messages = messages,
