@@ -78,11 +78,12 @@ constructor(
                             maybeRestartListening()
                         },
                         onGhostSpeechEnd = {
-                            Timber.d("CGH: Streaming finished")
+                            Timber.d("CGH: onGhostSpeechEnd() @ ${System.currentTimeMillis()} - state ${_ghostUiState.value.conversationState}")
                             updateConversationState(ConversationState.Idle)
                             maybeRestartListening()
                         },
                         onGhostSpeechStart = {
+                            Timber.d("CGH: onGhostSpeechStart() @ ${System.currentTimeMillis()} - state ${_ghostUiState.value.conversationState}")
                             updateConversationState(ConversationState.GhostTalking)
                         },
                     )
@@ -97,21 +98,24 @@ constructor(
     }
 
     fun onUserSpeechStart() {
-        Timber.d("CGH: onUserSpeechStart() with state: ${_ghostUiState.value.conversationState}")
+        Timber.d("CGH: onUserSpeechStart() @ ${System.currentTimeMillis()} - state ${_ghostUiState.value.conversationState}")
         if (_ghostUiState.value.conversationState == ConversationState.Idle) {
             updateConversationState(ConversationState.UserTalking)
         }
     }
 
     fun onUserSpeechEnd(result: String?) {
+        Timber.d("CGH: onUserSpeechEnd() @ ${System.currentTimeMillis()} - state ${_ghostUiState.value.conversationState}")
         if (_ghostUiState.value.conversationState == ConversationState.UserTalking) {
             updateConversationState(ConversationState.Idle)
         }
 
-        Timber.d("CGH: onUserSpeechEnd: $result")
-
         if (!result.isNullOrBlank()) {
-            userInputChannel.trySend(UserInput.Voice(result))
+            if (_ghostUiState.value.conversationState != ConversationState.GhostTalking) {
+                userInputChannel.trySend(UserInput.Voice(result))
+            } else {
+                Timber.d("CGH: Ignoring user input — ghost is busy: ${_ghostUiState.value.conversationState}")
+            }
         } else {
             restartRecognizerWithDelay()
         }
@@ -169,11 +173,13 @@ constructor(
     }
 
     private fun maybeRestartListening() {
+        Timber.d("CGH: maybeRestartListening() @ ${System.currentTimeMillis()} - state ${_ghostUiState.value.conversationState}")
         if (_ghostUiState.value.conversationState == ConversationState.Idle) {
-            Timber.d("CGH: maybeRestartListening() called")
             viewModelScope.launch(Dispatchers.Main) {
                 speechRecognizerManager?.startListening()
             }
+        } else {
+            Timber.d("CGH: maybeRestartListening() called, but Skipping recognizer start — state: ${_ghostUiState.value.conversationState}")
         }
     }
 
@@ -207,6 +213,7 @@ constructor(
     }
 
     private fun updateConversationState(state: ConversationState) {
+        Timber.d("CGH: updateConversationState @ ${System.currentTimeMillis()} - state ${_ghostUiState.value.conversationState}")
         _ghostUiState.update { it.copy(conversationState = state) }
     }
 }
