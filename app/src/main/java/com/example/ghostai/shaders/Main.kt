@@ -91,7 +91,7 @@ object Main {
 
             if (eyes.mask > 0.0) {
                 // Brighter edge for more contrast — like a recessed socket
-                vec3 eyeOuterColor = vec3(0.6, 0.6, 0.6); // shadowy green-gray
+                vec3 eyeOuterColor = vec3(0.4, 0.45, 0.4); // shadowy green-gray
                 vec3 eyeInnerColor = vec3(1.0);   // black center
 
                 vec3 eyeGradientColor = mix(eyeInnerColor, eyeOuterColor, eyes.gradient);

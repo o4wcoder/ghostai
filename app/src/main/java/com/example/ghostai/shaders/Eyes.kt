@@ -25,6 +25,13 @@ object Eyes {
             // Create gradient: 0 (center) to 1 (edge)
             float leftGradient = smoothstep(0.75, 1.0, leftDist) * leftEyeShape;
             float rightGradient = smoothstep(0.75, 1.0, rightDist) * rightEyeShape;
+            
+            // NEW: Add vertical falloff to simulate socket below eye center
+            float leftVerticalOffset = clamp((uv.y - leftEye.y) / eyeRadiusY, 0.0, 1.0);
+            float rightVerticalOffset = clamp((uv.y - rightEye.y) / eyeRadiusY, 0.0, 1.0);
+            // Multiply the gradient by the vertical offset to emphasize shading below eye center
+            leftGradient *= leftVerticalOffset;
+            rightGradient *= rightVerticalOffset;
 
             float eyeGradient = max(leftGradient, rightGradient); // max keeps only strongest contribution
 
@@ -35,7 +42,7 @@ object Eyes {
         }
 
         PupilData drawPupils(vec2 uv, vec2 leftEye, vec2 rightEye, float isBlinking) {
-            float pupilRadius = 0.020;
+            float pupilRadius = 0.025;
 
             vec2 leftDelta = uv - leftEye;
             vec2 rightDelta = uv - rightEye;
@@ -81,7 +88,8 @@ object Eyes {
             } else if (emotionId == 5.0) {  // Funny
                 return vec3(1.0, 0.6, 1.0);    // Pinkish
             } else {                        // Neutral (default)
-                return vec3(0.6, 0.9, 0.6);    // Pale green (neutral)
+               // return vec3(0.6, 0.9, 0.6);    // Pale green (neutral)
+               return vec3(0.0);
             }
         }
 
@@ -97,7 +105,8 @@ object Eyes {
             } else if (emotionId == 5.0) {  // Funny
                 return vec3(0.3, 0.0, 0.3);    // Dark magenta
             } else {                        // Neutral (default)
-                return vec3(0.063, 0.302, 0.063);  // Dark green (neutral)
+              //  return vec3(0.063, 0.302, 0.063);  // Dark green (neutral)
+              return vec3(0.0);
             }
         }
 
