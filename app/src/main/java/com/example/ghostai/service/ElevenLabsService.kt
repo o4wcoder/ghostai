@@ -13,6 +13,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import com.example.ghostai.audioeffects.GhostRenderersFactory
 import com.example.ghostai.network.model.ElevenLabsSpeechToTextResult
 import io.ktor.client.HttpClient
 import io.ktor.client.request.accept
@@ -48,6 +49,7 @@ private const val ELEVEN_LABS_API_BASE = "https://api.elevenlabs.io/v1"
 private const val CHAROLETTE_VOICE_ID = "XB0fDUnXU5powFXDhCwa"
 private const val DEMON_MONSTER_VOICE_ID = "vfaqCOvlrKi4Zp7C2IAm"
 
+@UnstableApi
 class ElevenLabsService(
     private val apiKey: String,
     private val client: HttpClient,
@@ -167,30 +169,32 @@ class ElevenLabsService(
                     webSocket.send(endMsg)
 
                     // Set up ExoPlayer
-                    exoPlayer = ExoPlayer.Builder(application.applicationContext).build().apply {
-                        addListener(object : Player.Listener {
-                            override fun onPlaybackStateChanged(state: Int) {
-                                when (state) {
-                                    Player.STATE_READY -> {
-                                        if (exoPlayer?.playWhenReady == true) {
-                                            onGhostSpeechStart()
+                    exoPlayer = ExoPlayer.Builder(application.applicationContext)
+                        .setRenderersFactory(GhostRenderersFactory(application.applicationContext))
+                        .build().apply {
+                            addListener(object : Player.Listener {
+                                override fun onPlaybackStateChanged(state: Int) {
+                                    when (state) {
+                                        Player.STATE_READY -> {
+                                            if (exoPlayer?.playWhenReady == true) {
+                                                onGhostSpeechStart()
+                                            }
                                         }
+                                        Player.STATE_ENDED -> {
+                                            stopStreamingSpeech()
+                                            onGhostSpeechEnd()
+                                        }
+                                        else -> {}
                                     }
-                                    Player.STATE_ENDED -> {
-                                        stopStreamingSpeech()
-                                        onGhostSpeechEnd()
-                                    }
-                                    else -> {}
                                 }
-                            }
 
-                            override fun onPlayerError(error: PlaybackException) {
-                                Timber.e(error, "ExoPlayer playback error")
-                                stopStreamingSpeech()
-                                onError(error)
-                            }
-                        })
-                    }
+                                override fun onPlayerError(error: PlaybackException) {
+                                    Timber.e(error, "ExoPlayer playback error")
+                                    stopStreamingSpeech()
+                                    onError(error)
+                                }
+                            })
+                        }
                 }
 
                 override fun onMessage(webSocket: WebSocket, text: String) {
