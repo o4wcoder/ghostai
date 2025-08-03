@@ -85,6 +85,34 @@ object Main {
 
             float ghostDistFactor = smoothstep(0.0, radius, length(ghostUV));
             vec3 ghostShadedColor = mix(ghostInnerColor, ghostEdgeColor, ghostDistFactor);
+            
+            // === Eye socket shading on face (below eyes) ===
+            vec2 leftShadowPos = leftEye + vec2(0.0, 0.04);
+            vec2 rightShadowPos = rightEye + vec2(0.0, 0.04);
+            float shadowRadius = 0.085;
+
+            float leftSocketDist = length(faceUV - leftShadowPos);
+            float rightSocketDist = length(faceUV - rightShadowPos);
+
+            float leftSocketShadow = smoothstep(shadowRadius, 0.0, leftSocketDist);
+            float rightSocketShadow = smoothstep(shadowRadius, 0.0, rightSocketDist);
+
+            float eyeSocketShadow = max(leftSocketShadow, rightSocketShadow);
+
+            vec3 socketTint = vec3(0.0, 0.2, 0.0); // subtle green shadow
+            ghostShadedColor = mix(ghostShadedColor, socketTint, 0.4 * eyeSocketShadow);
+            
+            // brighten above each eye to exaggerate depth
+            vec2 aboveLeftEye = leftEye + vec2(0.0, -0.065);
+            vec2 aboveRightEye = rightEye + vec2(0.0, -0.065);
+            float highlightRadius = 0.06;
+
+            float leftHighlight = smoothstep(highlightRadius, 0.0, length(faceUV - aboveLeftEye));
+            float rightHighlight = smoothstep(highlightRadius, 0.0, length(faceUV - aboveRightEye));
+            float eyeRimHighlight = max(leftHighlight, rightHighlight);
+
+            ghostShadedColor = mix(ghostShadedColor, vec3(1.0, 1.0, 1.0), 0.25 * eyeRimHighlight);
+
 
             // === Composite ghost over mist ===
             vec3 finalColor = mix(mistColor, ghostShadedColor, ghostMask);
