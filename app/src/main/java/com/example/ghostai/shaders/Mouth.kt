@@ -7,9 +7,22 @@ object Mouth {
     val mouth = """
              MouthData drawMouth(vec2 uv, float iTime, float isSpeaking) {
             float baseMouthY = 0.08;
-            float mouthWidth = 0.15;
 
             float baseMouthHeight = 0.01;
+
+            // Randomly trigger O-mouth shape while speaking ===
+            // O-mouth logic: fade in and out smoothly
+            float oShapeCycle = floor(iTime * 2.5); // every 0.4s
+            float oShapeRand = fract(sin(oShapeCycle * 23.0) * 65437.234);
+            float oShapeActive = step(0.82, oShapeRand) * isSpeaking;
+
+            float cycleProgress = fract(iTime * 2.5); // progress through the 0.4s cycle
+            float fadeIn = smoothstep(0.0, 0.2, cycleProgress);
+            float fadeOut = 1.0 - smoothstep(0.8, 1.0, cycleProgress);
+            float oShapeWeight = oShapeActive * min(fadeIn, fadeOut); // fades in and out
+
+            float oShapeFactor = mix(1.0, 0.5, oShapeWeight);
+            float oHeightFactor = mix(1.0, 1.8, oShapeWeight);
 
             // Idle "breathing" motion — slow and subtle
             float idleWiggle = 0.005 * sin(iTime * 1.5);
@@ -21,6 +34,7 @@ object Mouth {
             float talkingHeight = 0.05 * speakingAmplitude;
 
             // Combine them
+            float mouthWidth = 0.12 * oShapeFactor;
             float mouthHeight = baseMouthHeight + idleWiggle * (1.0 - isSpeaking) + talkingHeight * isSpeaking;
 
             float mouthWiggle = 0.01 * sin(iTime * 1.0) * (1.0 - isSpeaking);
