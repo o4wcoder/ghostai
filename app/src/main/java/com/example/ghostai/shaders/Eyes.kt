@@ -17,8 +17,8 @@ object Eyes {
             float leftDist = length(leftNorm);
             float rightDist = length(rightNorm);
 
-            float leftEyeShape = step(leftDist, 1.0);
-            float rightEyeShape = step(rightDist, 1.0);
+            float leftEyeShape = 1.0 - smoothstep(0.9, 1.0, leftDist);
+            float rightEyeShape = 1.0 - smoothstep(0.9, 1.0, rightDist);
 
             float eyeMask = leftEyeShape + rightEyeShape;
 

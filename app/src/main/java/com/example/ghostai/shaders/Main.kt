@@ -37,8 +37,9 @@ object Main {
             float moveCycle = floor(iTime / 3.0); // change every 3 seconds
             float cycleTime = fract(iTime / 3.0); // 0 → 1 within cycle
             float moveProgress = smoothstep(0.0, 0.2, cycleTime) * (1.0 - smoothstep(0.8, 1.0, cycleTime)); // ease in/out
-
-            vec2 pupilOffset = randomPupilOffset(moveCycle) * moveProgress * (1.0 - isBlinking);
+            
+            vec2 neutralOffset = vec2(0.0, 0.01); // small downward look
+            vec2 pupilOffset = neutralOffset + randomPupilOffset(moveCycle) * moveProgress * (1.0 - isBlinking);
 
             // === Eye shape and position ===
             vec2 leftEye = vec2(-0.10, -0.08);
@@ -112,18 +113,33 @@ object Main {
             float eyeRimHighlight = max(leftHighlight, rightHighlight);
 
             ghostShadedColor = mix(ghostShadedColor, vec3(1.0, 1.0, 1.0), 0.25 * eyeRimHighlight);
+            
+            // === Ambient Occlusion (AO) around eyes ===
+            float aoRadius = 0.09;
+            float aoStrength = 0.35;
 
+            float leftAODist = length(faceUV - leftEye);
+            float rightAODist = length(faceUV - rightEye);
+
+            float leftAO = smoothstep(aoRadius, 0.05, leftAODist);
+            float rightAO = smoothstep(aoRadius, 0.05, rightAODist);
+
+            float eyeAO = max(leftAO, rightAO);
+
+            // AO tint — subtle dark green
+            vec3 aoColor = vec3(0.0, 0.15, 0.0);
+            ghostShadedColor = mix(ghostShadedColor, aoColor, aoStrength * eyeAO);
 
             // === Composite ghost over mist ===
             vec3 finalColor = mix(mistColor, ghostShadedColor, ghostMask);
 
             if (eyes.mask > 0.0) {
                 // Brighter edge for more contrast — like a recessed socket
-                vec3 eyeOuterColor = vec3(0.4, 0.45, 0.4); // shadowy green-gray
-                vec3 eyeInnerColor = vec3(1.0);   // black center
+                vec3 eyeOuterColor = vec3(0.4, 0.45, 0.4); 
+                vec3 eyeInnerColor = vec3(1.0);   
 
                 vec3 eyeGradientColor = mix(eyeInnerColor, eyeOuterColor, eyes.gradient);
-                finalColor = mix(finalColor, eyeGradientColor, eyes.mask);
+               finalColor = mix(finalColor, eyeGradientColor, eyes.mask);
             }
 
           if (pupils.mask > 0.0) {
