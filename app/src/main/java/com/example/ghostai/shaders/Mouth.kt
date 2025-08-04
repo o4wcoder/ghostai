@@ -5,7 +5,19 @@ import org.intellij.lang.annotations.Language
 object Mouth {
     @Language("AGSL")
     val mouth = """
-             MouthData drawMouth(vec2 uv, float iTime, float isSpeaking) {
+        float getMouthFrownAmount(float emotionId) {
+            if (emotionId == 1.0) {         // Angry
+                return 1.0;                 // Deep frown
+            } else if (emotionId == 2.0) {  // Happy
+                return -0.5;                // Slight smile
+            } else if (emotionId == 3.0) {  // Sad
+                return 0.5;                 // Gentle frown
+            } else {
+                return 0.0;                 // Neutral / default
+            }
+        }
+        
+        MouthData drawMouth(vec2 uv, float iTime, float isSpeaking) {
             float baseMouthY = 0.08;
 
             float baseMouthHeight = 0.01;
@@ -39,6 +51,14 @@ object Mouth {
 
             float mouthWiggle = 0.01 * sin(iTime * 1.0) * (1.0 - isSpeaking);
             vec2 mouthDelta = uv - vec2(mouthWiggle, baseMouthY);
+            
+                // === Emotion-based frown/smile curvature ===
+            float frownStart = getMouthFrownAmount(uStartState);
+            float frownTarget = getMouthFrownAmount(uTargetState);
+            float frownAmount = mix(frownStart, frownTarget, uTransitionProgress);
+
+            float curve = -frownAmount * (mouthDelta.x * mouthDelta.x - mouthWidth * mouthWidth);
+            mouthDelta.y += curve;
 
             // Distort the sides of the mouth
             float phase = isSpeaking > 0.0 ? iTime * 5.0 : 0.0;
