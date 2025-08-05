@@ -25,6 +25,7 @@ object Uniforms {
         struct MouthData {
             float mask;
             float gradient;
+            float lipShadow;
         };
 
 

@@ -67,11 +67,25 @@ object Mouth {
             vec2 warpedDelta = vec2(mouthDelta.x / mouthWidth, mouthDelta.y / (mouthHeight * mouthShapeWarp));
             float mouthMask = step(length(warpedDelta), 1.0);
 
+            // Shadow under mouth to simulate lip
+            // Simulate a shadow just under the bottom of the mouth
+            vec2 shadowOffset = warpedDelta  + vec2(0.0, -1.0); // move "target" area downward
+            vec2 lipShapeOffset = vec2(shadowOffset.x * 1.2, shadowOffset.y);
+            float baseShadow = smoothstep(1.0, 0.7, length(lipShapeOffset));
+
+            // Clip off the upper part to make a crescent
+            float verticalCutoff = smoothstep(0.0, 0.4, shadowOffset.y); // fades out above 0
+            float crescentShadow = baseShadow * verticalCutoff;
+
+            //float lipShadowStrength = 0.1 * lipShadowRegion * isSpeaking;
+            float lipShadowStrength = 0.07 * crescentShadow * isSpeaking;
+
             float mouthGradient = smoothstep(0.0, 1.0, length(vec2(mouthDelta.x / mouthWidth, mouthDelta.y / mouthHeight)));
 
             MouthData result;
             result.mask = mouthMask;
             result.gradient = mouthGradient;
+            result.lipShadow = lipShadowStrength;
             return result;
         }
     """.trimIndent()
