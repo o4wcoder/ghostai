@@ -160,15 +160,21 @@ object Main {
               finalColor = mix(finalColor, pupilColor, pupils.mask);
           }
 
-
             // === Alpha fade at ghost edges ===
             float alphaFade = smoothstep(radius, radius - 0.05, length(ellipticalUV));
             float finalAlpha = mix(1.0, ghostMask * alphaFade, ghostMask);
+            
+//            vec3 lipShadowColor = vec3(0.0, 0.1, 0.0); // soft green-black shadow
+//            finalColor = mix(finalColor, lipShadowColor, 0.05 * mouth.topLipShadow);
+//            
+//            // Subtle highlight above top lip
+//            vec3 topLipColor = vec3(1.0); // white highlight
+//            finalColor = mix(finalColor, topLipColor, 0.4 * mouth.lipHighlight);
 
             // === Subtle shadow under bottom lip ===
             // Must be added *before* drawing the actual mouth so it layers underneath
             vec3 lipShadowColor = vec3(0.0, 0.1, 0.0); // dark green, subtle
-            finalColor = mix(finalColor, lipShadowColor, mouth.lipShadow);
+            finalColor = mix(finalColor, lipShadowColor, mouth.bottomLipShadow);
 
             if (mouth.mask > 0.0) {
                 vec3 mouthOuterColor = vec3(0.2, 0.3, 0.2);

@@ -52,7 +52,7 @@ object Mouth {
             float mouthWiggle = 0.01 * sin(iTime * 1.0) * (1.0 - isSpeaking);
             vec2 mouthDelta = uv - vec2(mouthWiggle, baseMouthY);
             
-                // === Emotion-based frown/smile curvature ===
+             // === Emotion-based frown/smile curvature ===
             float frownStart = getMouthFrownAmount(uStartState);
             float frownTarget = getMouthFrownAmount(uTargetState);
             float frownAmount = mix(frownStart, frownTarget, uTransitionProgress);
@@ -61,11 +61,35 @@ object Mouth {
             mouthDelta.y += curve;
 
             // Distort the sides of the mouth
-            float phase = isSpeaking > 0.0 ? iTime * 5.0 : 0.0;
             float mouthShapeWarp = 1.0 + 0.1 * sin(mouthDelta.x * 8.0 + iTime * 2.0);
 
             vec2 warpedDelta = vec2(mouthDelta.x / mouthWidth, mouthDelta.y / (mouthHeight * mouthShapeWarp));
             float mouthMask = step(length(warpedDelta), 1.0);
+            
+            // Top lip shadow — positioned above the top highlight
+//            vec2 topShadowOffset = warpedDelta + vec2(0.0, 1.2); // further up than highlight
+//            vec2 topShadowShape = vec2(topShadowOffset.x * 1.2, topShadowOffset.y); // stretch horizontally
+//
+//            float shadowFalloff = smoothstep(1.2, 0.8, length(topShadowShape));
+//
+//            // Fade it out above — this avoids a mustache effect
+//            float verticalFadeShadow = smoothstep(0.6, 0.0, topShadowOffset.y);
+//
+//            // Optional: Taper at the sides
+//            float horizontalFadeShadow = smoothstep(1.2, 0.5, abs(topShadowOffset.x));
+//
+//            float topLipShadow = shadowFalloff * verticalFadeShadow * horizontalFadeShadow;
+//            float topListShadowStrength = topLipShadow * isSpeaking;
+            
+            // Top lip highlight — positioned above the mouth
+            vec2 topOffset = warpedDelta + vec2(0.0, 0.5); // move "target" area upward
+            vec2 topLipShape = vec2(topOffset.x * 1.4, topOffset.y); // slightly stretched
+
+            float baseHighlight = smoothstep(1.1, 0.7, length(topLipShape));
+            float verticalFade = smoothstep(0.4, 0.0, topOffset.y); // 1.0 above, fades out toward mouth
+            float horizontalFade = smoothstep(1.2, 0.5, abs(topOffset.x));
+            float topLipHighlight = baseHighlight * verticalFade * horizontalFade;
+
 
             // Shadow under mouth to simulate lip
             // Simulate a shadow just under the bottom of the mouth
@@ -77,15 +101,16 @@ object Mouth {
             float verticalCutoff = smoothstep(0.0, 0.4, shadowOffset.y); // fades out above 0
             float crescentShadow = baseShadow * verticalCutoff;
 
-            //float lipShadowStrength = 0.1 * lipShadowRegion * isSpeaking;
-            float lipShadowStrength = 0.07 * crescentShadow * isSpeaking;
+            float bottomLipShadowStrength = 0.07 * crescentShadow * isSpeaking;
 
             float mouthGradient = smoothstep(0.0, 1.0, length(vec2(mouthDelta.x / mouthWidth, mouthDelta.y / mouthHeight)));
 
             MouthData result;
             result.mask = mouthMask;
             result.gradient = mouthGradient;
-            result.lipShadow = lipShadowStrength;
+         //   result.topLipShadow = topListShadowStrength;
+            result.bottomLipShadow = bottomLipShadowStrength;
+          //  result.lipHighlight = topLipHighlight;
             return result;
         }
     """.trimIndent()
