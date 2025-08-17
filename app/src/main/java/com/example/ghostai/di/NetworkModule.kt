@@ -29,8 +29,12 @@ object NetworkModule {
     @Singleton
     fun provideOpenAIService(
         client: HttpClient,
+        application: Application,
     ): OpenAIService {
-        return OpenAIService(BuildConfig.OPENAI_API_KEY, client)
+        return OpenAIService(
+            apiKey = BuildConfig.OPENAI_API_KEY,
+            client = client, application = application
+        )
     }
 
     @Provides

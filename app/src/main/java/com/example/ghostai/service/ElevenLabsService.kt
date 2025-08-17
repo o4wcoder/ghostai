@@ -49,7 +49,7 @@ private const val ELEVEN_LABS_API_BASE = "https://api.elevenlabs.io/v1"
 private const val CHAROLETTE_VOICE_ID = "XB0fDUnXU5powFXDhCwa"
 private const val DEMON_MONSTER_VOICE_ID = "vfaqCOvlrKi4Zp7C2IAm"
 
-@UnstableApi
+@OptIn(UnstableApi::class)
 class ElevenLabsService(
     private val apiKey: String,
     private val client: HttpClient,
