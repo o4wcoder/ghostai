@@ -89,12 +89,28 @@ object Main {
 
             mistColor *= 1.0 - 0.3 * glowFalloff;
             mistColor += ghostGlowColor * glowFalloff * 1.5;
-            
-            // add moon disc
-            vec3 moonColor = mix(mistColor, moon.color, moon.mask);
-            // allow ~20% of the glow to bleed under the disc, but only at the rim band
-            moonColor += moon.glow * GLOW_COLOR * ((1.0 - moon.mask) + 0.20 * moon.rim);
-            
+
+            // === Clouds in front of the moon ===
+            vec2 cloudUV = (fragCoord / iResolution) * 2.2 + vec2(iTime * 0.02, iTime * 0.015);
+            float cloudNoise = fbm(cloudUV);
+            // lower the threshold a bit so more pixels count as cloud
+            float cloudFront = smoothstep(0.52, 0.72, cloudNoise);
+
+            // --- 1) Disc WITH cloud occlusion (noticeable) ---
+            const float DISC_OCCLUDE = 0.50;  // try 0.50 to see it clearly; later 0.35–0.45
+            vec3 occludedDisc = mix(moon.color, moon.color * (1.0 - DISC_OCCLUDE), cloudFront);
+            vec3 moonColor = mix(mistColor, occludedDisc, moon.mask); 
+
+            // --- 2) Halo with rim bleed + cloud occlusion ---
+            const float RIM_BLEED = 0.20; 
+            const float CLOUD_OCCLUSION = 0.80; // a bit stronger so clouds eat more halo
+            float haloMask = (1.0 - moon.mask) + RIM_BLEED * moon.rim;
+            moonColor += moon.glow * GLOW_COLOR * haloMask * (1.0 - CLOUD_OCCLUSION * cloudFront);
+
+            // --- 3) (Optional) tiny blue scatter near the halo in clear areas ---
+            float nearHalo = clamp(moon.glow * 1.3, 0.0, 1.0);
+            moonColor += (1.0 - cloudFront) * nearHalo * vec3(0.02, 0.05, 0.07);
+
             // === Ghost body shading (3D effect) ===
             vec3 ghostInnerColor = vec3(0.2, 1.0, 0.2);  // bright green
             vec3 ghostEdgeColor  = vec3(0.0, 0.4, 0.0);  // darker green
