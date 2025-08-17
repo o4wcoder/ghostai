@@ -5,175 +5,162 @@ import org.intellij.lang.annotations.Language
 object Main {
     @Language("AGSL")
     val main = """
-            half4 main(vec2 fragCoord) {
-            vec2 uv = fragCoord / iResolution;
-            
-            vec2 centered = (fragCoord - 0.5 * iResolution) / min(iResolution.x, iResolution.y);
-                      
-             MoonData moon = drawMoon(
-                 centered,
-                 vec2(0.20, -0.78), // tweak position in normalized coords
-                 0.18,              // radius (consistent circle)
-                 0.40,              // glow
-                 0.35,
-                 iTime
-             );
+half4 main(vec2 fragCoord) {
+    vec2 uv = fragCoord / iResolution;
+    vec2 centered = (fragCoord - 0.5 * iResolution) / min(iResolution.x, iResolution.y);
 
-            // === Floating animation ===
-            float floatOffset = 0.03 * sin(iTime * 0.7);
-            vec2 ghostCenterUV = vec2(0.5, 0.5 + floatOffset);
+    // === Moon ===
+    MoonData moon = drawMoon(
+        centered,
+        vec2(0.20, -0.78),
+        0.18,
+        0.40,
+        0.35,
+        iTime
+    );
 
-            // === Ghost body shape with tail wave ===
-            vec2 ghostUV = centered;
-            ghostUV.y += floatOffset;
-            vec2 faceUV = ghostUV; // Save before applying the tail wave
-            float tailWave = 0.05 * sin(ghostUV.x * 15.0 + iTime * 2.0);
-            float tailFactor = smoothstep(0.0, 0.3, ghostUV.y);
-            ghostUV.y += tailWave * tailFactor;
+    // === Floating animation ===
+    float floatOffset = 0.03 * sin(iTime * 0.7);
 
-            ghostUV.x *= mix(1.0, 0.4, smoothstep(0.0, 0.6, ghostUV.y));
+    // === Ghost coords ===
+    vec2 ghostUV = centered;
+    ghostUV.y += floatOffset;
+    vec2 faceUV = ghostUV;
+    float tailWave = 0.05 * sin(ghostUV.x * 15.0 + iTime * 2.0);
+    float tailFactor = smoothstep(0.0, 0.3, ghostUV.y);
+    ghostUV.y += tailWave * tailFactor;
+    ghostUV.x *= mix(1.0, 0.4, smoothstep(0.0, 0.6, ghostUV.y));
 
-            float radius = 0.4;
-            // Stretch ghost vertically
-            vec2 ellipticalUV = vec2(ghostUV.x, ghostUV.y * 0.9);
-            float ghostBody = smoothstep(radius, radius - 0.1, length(ellipticalUV));
+    float radius = 0.4;
+    vec2 ellipticalUV = vec2(ghostUV.x, ghostUV.y * 0.9);
+    float ghostBody = smoothstep(radius, radius - 0.1, length(ellipticalUV));
+    float ghostMask = smoothstep(0.01, 0.99, ghostBody);
 
-            float ghostMask = smoothstep(0.01, 0.99, ghostBody);
+    // === Eyes / pupils ===
+    float isBlinking = isBlinking(iTime);
+    float moveCycle = floor(iTime / 3.0);
+    float cycleTime = fract(iTime / 3.0);
+    float moveProgress = smoothstep(0.0, 0.2, cycleTime) * (1.0 - smoothstep(0.8, 1.0, cycleTime));
+    vec2 neutralOffset = vec2(0.0, 0.01);
+    vec2 pupilOffset = neutralOffset + randomPupilOffset(moveCycle) * moveProgress * (1.0 - isBlinking);
+    vec2 leftEye = vec2(-0.10, -0.08);
+    vec2 rightEye = vec2( 0.10, -0.08);
 
-            // === Blinking logic ===
-            float isBlinking = isBlinking(iTime);
+    EyeData eyes = drawEyes(faceUV, leftEye, rightEye, isBlinking);
+    PupilData pupils = drawPupils(faceUV, leftEye + pupilOffset, rightEye + pupilOffset, isBlinking);
+    MouthData mouth = drawMouth(faceUV, iTime, isSpeaking);
 
-            // === Pupil Movement Logic ===
-            float moveCycle = floor(iTime / 3.0); // change every 3 seconds
-            float cycleTime = fract(iTime / 3.0); // 0 → 1 within cycle
-            float moveProgress = smoothstep(0.0, 0.2, cycleTime) * (1.0 - smoothstep(0.8, 1.0, cycleTime)); // ease in/out
-            
-            vec2 neutralOffset = vec2(0.0, 0.01); // small downward look
-            vec2 pupilOffset = neutralOffset + randomPupilOffset(moveCycle) * moveProgress * (1.0 - isBlinking);
+    // === Mist background ===
+    vec2 mistUV = uv * 3.0 + vec2(iTime * 0.08, iTime * 0.03);
+    float mistNoise = fbm(mistUV);
+    float mistStrength = 0.5;
+    vec3 mistColor = vec3(0.85) * (mistNoise * mistStrength);
 
-            // === Eye shape and position ===
-            vec2 leftEye = vec2(-0.10, -0.08);
-            vec2 rightEye = vec2( 0.10, -0.08);
-            
-            // === Eyes ===
-            EyeData eyes = drawEyes(faceUV, leftEye, rightEye, isBlinking);
-            // === Pupils ===
-             PupilData pupils = drawPupils(faceUV, leftEye + pupilOffset, rightEye + pupilOffset, isBlinking);
-            // === Mouth ===
-             MouthData mouth = drawMouth(faceUV, iTime, isSpeaking);
+    // Lightning
+    float lightningSeed = floor(iTime * 2.0);
+    float lightningRand = fract(sin(lightningSeed * 91.345) * 47453.25);
+    float lightningActive = step(0.95, lightningRand);
+    float lightningFade = smoothstep(0.0, 0.5, fract(iTime)) * (1.0 - smoothstep(0.5, 1.0, fract(iTime)));
+    float lightning = lightningActive * lightningFade;
+    float lightningMask = smoothstep(1.0, 0.4, uv.y);
+    mistColor += lightning * lightningMask * vec3(0.3, 0.4, 0.5);
 
-            // === Mist background using fbm noise ===
-            vec2 mistUV = uv * 3.0 + vec2(iTime * 0.08, iTime * 0.03);
-            float mistNoise = fbm(mistUV);
-            float mistStrength = 0.5;
-            vec3 mistColor = vec3(0.85) * (mistNoise * mistStrength);
-            
-            // === Lightning trigger (random flash like blinking) ===
-            float lightningSeed = floor(iTime * 2.0);  // check twice a second
-            float lightningRand = fract(sin(lightningSeed * 91.345) * 47453.25);
-            float lightningActive = step(0.95, lightningRand); // ~0.5% chance per check
+    // Ghost glow on mist
+    vec3 ghostGlowColor = vec3(0.2 + 0.4 * isSpeaking, 1.0, 0.2 + 0.4 * isSpeaking);
+    float ghostDist = length(ghostUV);
+    float glowFalloff = smoothstep(0.5, 0.0, ghostDist);
+    mistColor *= 1.0 - 0.3 * glowFalloff;
+    mistColor += ghostGlowColor * glowFalloff * 1.5;
 
-            // Fade lightning within frame
-            float lightningFade = smoothstep(0.0, 0.5, fract(iTime)) * (1.0 - smoothstep(0.5, 01.0, fract(iTime)));
-            float lightning = lightningActive * lightningFade;
+    // === Clouds before moon composite ===
+    vec2 cloudUV = (fragCoord / iResolution) * 2.2 + vec2(iTime * 0.02, iTime * 0.015);
+    float cloudNoise = fbm(cloudUV);
+    float cloudFront = smoothstep(0.52, 0.72, cloudNoise);
 
-            // Apply lightning as a bright flash
-            // Example: lightning stronger at top of screen
-            float lightningMask = smoothstep(1.0, 0.4, uv.y);  // fades from 0 at bottom to 1 at top
-            mistColor += lightning * lightningMask * vec3(0.3, 0.4, 0.5); // bluish, not white
+    // Moon disc with occlusion
+    const float DISC_OCCLUDE = 0.50;
+    vec3 occludedDisc = mix(moon.color, moon.color * (1.0 - DISC_OCCLUDE), cloudFront);
+    vec3 moonColor = mix(mistColor, occludedDisc, moon.mask);
 
-            // === Ghost glow influence on mist ===
-            vec3 ghostGlowColor = vec3(0.2 + 0.4 * isSpeaking, 1.0, 0.2 + 0.4 * isSpeaking);
-            float ghostDist = length(ghostUV);
-            float glowFalloff = smoothstep(0.5, 0.0, ghostDist);
+    // Halo
+    const float RIM_BLEED = 0.20;
+    const float CLOUD_OCCLUSION = 0.80;
+    float haloMask = (1.0 - moon.mask) + RIM_BLEED * moon.rim;
+    moonColor += moon.glow * GLOW_COLOR * haloMask * (1.0 - CLOUD_OCCLUSION * cloudFront);
 
-            mistColor *= 1.0 - 0.3 * glowFalloff;
-            mistColor += ghostGlowColor * glowFalloff * 1.5;
+    // Tiny blue scatter near halo
+    float nearHalo = clamp(moon.glow * 1.3, 0.0, 1.0);
+    moonColor += (1.0 - cloudFront) * nearHalo * vec3(0.02, 0.05, 0.07);
 
-            // === Clouds in front of the moon ===
-            vec2 cloudUV = (fragCoord / iResolution) * 2.2 + vec2(iTime * 0.02, iTime * 0.015);
-            float cloudNoise = fbm(cloudUV);
-            // lower the threshold a bit so more pixels count as cloud
-            float cloudFront = smoothstep(0.52, 0.72, cloudNoise);
+    // === Ground (UV space, bottom-only, never over ghost) ===
+    float groundY = 0.82;     // raise/lower horizon in 0..1 space
+    float feather = 0.03;     // softness of horizon edge
+    GroundData ground = drawGround(centered, iTime);
 
-            // --- 1) Disc WITH cloud occlusion (noticeable) ---
-            const float DISC_OCCLUDE = 0.50;  // try 0.50 to see it clearly; later 0.35–0.45
-            vec3 occludedDisc = mix(moon.color, moon.color * (1.0 - DISC_OCCLUDE), cloudFront);
-            vec3 moonColor = mix(mistColor, occludedDisc, moon.mask); 
+    // Make a bottom mask ourselves; do NOT use ground.mask
+    float fade = smoothstep(groundY - feather, groundY + feather, uv.y); // 0 below → 1 above
+    float bottomMask = 1.0 - fade;                                       // 1 below → 0 above
+    
+    // Strength of the ground “overlay” (0 = invisible, 1 = full replace)
+    float groundStrength = 0.5;  
+    
+    // If you want the dirt to be a bit translucent, set overlayStrength < 1
+    float overlayStrength = 0.9;
 
-            // --- 2) Halo with rim bleed + cloud occlusion ---
-            const float RIM_BLEED = 0.20; 
-            const float CLOUD_OCCLUSION = 0.80; // a bit stronger so clouds eat more halo
-            float haloMask = (1.0 - moon.mask) + RIM_BLEED * moon.rim;
-            moonColor += moon.glow * GLOW_COLOR * haloMask * (1.0 - CLOUD_OCCLUSION * cloudFront);
+    // Only below horizon (ground.mask) and never over the ghost
+    float groundBlend = ground.mask * (1.0 - ghostMask);
 
-            // --- 3) (Optional) tiny blue scatter near the halo in clear areas ---
-            float nearHalo = clamp(moon.glow * 1.3, 0.0, 1.0);
-            moonColor += (1.0 - cloudFront) * nearHalo * vec3(0.02, 0.05, 0.07);
+    // Compose ground over moon/mist
+    vec3 bg = mix(
+        moonColor,
+        mix(moonColor, ground.albedo, overlayStrength), // translucent dirt
+        groundBlend
+    );
 
-            // === Ghost body shading (3D effect) ===
-            vec3 ghostInnerColor = vec3(0.2, 1.0, 0.2);  // bright green
-            vec3 ghostEdgeColor  = vec3(0.0, 0.4, 0.0);  // darker green
+    // === Ghost shading ===
+    vec3 ghostInnerColor = vec3(0.2, 1.0, 0.2);
+    vec3 ghostEdgeColor  = vec3(0.0, 0.4, 0.0);
+    float ghostDistFactor = smoothstep(0.0, radius, length(ghostUV));
+    vec3 ghostShadedColor = mix(ghostInnerColor, ghostEdgeColor, ghostDistFactor);
 
-            float ghostDistFactor = smoothstep(0.0, radius, length(ghostUV));
-            vec3 ghostShadedColor = mix(ghostInnerColor, ghostEdgeColor, ghostDistFactor);
-            
-            // === Eye socket shading on face (below eyes) ===
-            vec2 leftShadowPos = leftEye + vec2(0.0, 0.04);
-            vec2 rightShadowPos = rightEye + vec2(0.0, 0.04);
-            float shadowRadius = 0.085;
+    // Socket tint
+    vec2 leftShadowPos = leftEye + vec2(0.0, 0.04);
+    vec2 rightShadowPos = rightEye + vec2(0.0, 0.04);
+    float shadowRadius = 0.085;
+    float leftSocketShadow = smoothstep(shadowRadius, 0.0, length(faceUV - leftShadowPos));
+    float rightSocketShadow = smoothstep(shadowRadius, 0.0, length(faceUV - rightShadowPos));
+    float eyeSocketShadow = max(leftSocketShadow, rightSocketShadow);
+    ghostShadedColor = mix(ghostShadedColor, vec3(0.0, 0.2, 0.0), 0.4 * eyeSocketShadow);
 
-            float leftSocketDist = length(faceUV - leftShadowPos);
-            float rightSocketDist = length(faceUV - rightShadowPos);
+    // Eye rim highlights
+    vec2 aboveLeftEye = leftEye + vec2(0.0, -0.065);
+    vec2 aboveRightEye = rightEye + vec2(0.0, -0.065);
+    float highlightRadius = 0.06;
+    float eyeRimHighlight = max(
+        smoothstep(highlightRadius, 0.0, length(faceUV - aboveLeftEye)),
+        smoothstep(highlightRadius, 0.0, length(faceUV - aboveRightEye))
+    );
+    ghostShadedColor = mix(ghostShadedColor, vec3(1.0), 0.25 * eyeRimHighlight);
 
-            float leftSocketShadow = smoothstep(shadowRadius, 0.0, leftSocketDist);
-            float rightSocketShadow = smoothstep(shadowRadius, 0.0, rightSocketDist);
+    // AO around eyes
+    float aoRadius = 0.09;
+    float aoStrength = 0.35;
+    float leftAO = smoothstep(aoRadius, 0.05, length(faceUV - leftEye));
+    float rightAO = smoothstep(aoRadius, 0.05, length(faceUV - rightEye));
+    float eyeAO = max(leftAO, rightAO);
+    ghostShadedColor = mix(ghostShadedColor, vec3(0.0, 0.15, 0.0), aoStrength * eyeAO);
 
-            float eyeSocketShadow = max(leftSocketShadow, rightSocketShadow);
+    // === Final composite ===
+    vec3 finalColor = mix(bg, ghostShadedColor, ghostMask);
+    finalColor = mixEyeColor(finalColor, eyes);
+    finalColor = mixPupilColor(finalColor, pupils);
+    finalColor = mixMouthColor(finalColor, mouth);
 
-            vec3 socketTint = vec3(0.0, 0.2, 0.0); // subtle green shadow
-            ghostShadedColor = mix(ghostShadedColor, socketTint, 0.4 * eyeSocketShadow);
-            
-            // brighten above each eye to exaggerate depth
-            vec2 aboveLeftEye = leftEye + vec2(0.0, -0.065);
-            vec2 aboveRightEye = rightEye + vec2(0.0, -0.065);
-            float highlightRadius = 0.06;
+    float alphaFade = smoothstep(radius, radius - 0.05, length(ellipticalUV));
+    float finalAlpha = mix(1.0, ghostMask * alphaFade, ghostMask);
 
-            float leftHighlight = smoothstep(highlightRadius, 0.0, length(faceUV - aboveLeftEye));
-            float rightHighlight = smoothstep(highlightRadius, 0.0, length(faceUV - aboveRightEye));
-            float eyeRimHighlight = max(leftHighlight, rightHighlight);
+    return half4(finalColor, finalAlpha);
+}
 
-            ghostShadedColor = mix(ghostShadedColor, vec3(1.0, 1.0, 1.0), 0.25 * eyeRimHighlight);
-            
-            // === Ambient Occlusion (AO) around eyes ===
-            float aoRadius = 0.09;
-            float aoStrength = 0.35;
-
-            float leftAODist = length(faceUV - leftEye);
-            float rightAODist = length(faceUV - rightEye);
-
-            float leftAO = smoothstep(aoRadius, 0.05, leftAODist);
-            float rightAO = smoothstep(aoRadius, 0.05, rightAODist);
-
-            float eyeAO = max(leftAO, rightAO);
-
-            // AO tint — subtle dark green
-            vec3 aoColor = vec3(0.0, 0.15, 0.0);
-            ghostShadedColor = mix(ghostShadedColor, aoColor, aoStrength * eyeAO);
-
-            // === Composite ghost over mist and moon ===
-            vec3 finalColor = mix(moonColor, ghostShadedColor, ghostMask);
-
-            finalColor = mixEyeColor(finalColor, eyes);
-            finalColor = mixPupilColor(finalColor, pupils);
-
-            // === Alpha fade at ghost edges ===
-            float alphaFade = smoothstep(radius, radius - 0.05, length(ellipticalUV));
-            float finalAlpha = mix(1.0, ghostMask * alphaFade, ghostMask);
-            
-            finalColor = mixMouthColor(finalColor, mouth);
-
-            return half4(finalColor, finalAlpha);
-        }
     """.trimIndent()
 }

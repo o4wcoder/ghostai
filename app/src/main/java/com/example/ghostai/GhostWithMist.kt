@@ -21,6 +21,7 @@ import com.example.ghostai.model.ConversationState
 import com.example.ghostai.model.Emotion
 import com.example.ghostai.model.GhostUiState
 import com.example.ghostai.shaders.Eyes
+import com.example.ghostai.shaders.Ground
 import com.example.ghostai.shaders.Main
 import com.example.ghostai.shaders.Moon
 import com.example.ghostai.shaders.Mouth
@@ -42,6 +43,7 @@ fun GhostWithMist(
         Moon.moon,
         Eyes.eyes,
         Mouth.mouth,
+        Ground.ground,
         Main.main,
     ).joinToString("\n")
 
