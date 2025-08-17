@@ -19,6 +19,7 @@ object Moon {
         struct MoonData {
             float mask;     // 0..1, the crisp moon disc
             float glow;     // 0..1, soft outer halo
+            float rim;      // 0..1, band just inside the rim
             vec3  color;    // premult not needed; we return plain rgb
         };
 
@@ -57,14 +58,21 @@ object Moon {
             // Distance in uv space
             float d = distance(uv, moonCenter);
             
+               // feather width scales with radius so it looks consistent
+            float seam = 0.012 * moonRadius;
+
+            // disc mask (feathered)
+            float edge = 1.0 - smoothstep(moonRadius - seam, moonRadius + seam, d);
+            
             // radial halo that is 1 at the rim and fades to 0 by glowRadius
             float halo = 1.0 - smoothstep(moonRadius, glowRadius, d);
             // final glow alpha (no contribution inside the disc; we gate with (1 - mask) in main)
             float alphaGlow = halo * GLOW_ALPHA;
 
-
             // Crisp disc edge
-            float edge = 1.0 - smoothstep(moonRadius - 0.002, moonRadius + 0.002, d);
+           // float edge = 1.0 - smoothstep(moonRadius - 0.002, moonRadius + 0.002, d);
+               // rim band INSIDE the disc only (used for slight glow underlap)
+              float rimInside = 1.0 - smoothstep(moonRadius - seam, moonRadius, d);
 
             // Subtle limb shading toward the rim
             float limbShade = mix(1.0, 0.85, smoothstep(0.6 * moonRadius, moonRadius, d));
@@ -77,6 +85,7 @@ object Moon {
             MoonData outData;
             outData.mask  = edge;
             outData.glow  = alphaGlow;
+            outData.rim   = rimInside;
             outData.color = MOON_COLOR * limbShade * craterShade;
             return outData;
         }

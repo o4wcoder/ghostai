@@ -90,10 +90,10 @@ object Main {
             mistColor *= 1.0 - 0.3 * glowFalloff;
             mistColor += ghostGlowColor * glowFalloff * 1.5;
             
-               // add moon disc
+            // add moon disc
             vec3 moonColor = mix(mistColor, moon.color, moon.mask);
-               // add moon glow outside the disc only (keeps mist from washing out)
-            moonColor += moon.glow * GLOW_COLOR * (1.0 - moon.mask);
+            // allow ~20% of the glow to bleed under the disc, but only at the rim band
+            moonColor += moon.glow * GLOW_COLOR * ((1.0 - moon.mask) + 0.20 * moon.rim);
             
             // === Ghost body shading (3D effect) ===
             vec3 ghostInnerColor = vec3(0.2, 1.0, 0.2);  // bright green
