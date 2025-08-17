@@ -118,5 +118,40 @@ object Eyes {
             float timeSinceBlink = iTime - nextBlinkTime;
             return step(0.0, timeSinceBlink) * step(timeSinceBlink, blinkDuration);
         }
+        
+        vec3 mixEyeColor(vec3 finalColor, EyeData eyes) {
+            if (eyes.mask > 0.0) {
+                // Brighter edge for more contrast — like a recessed socket
+                vec3 eyeOuterColor = vec3(0.4, 0.45, 0.4); 
+                vec3 eyeInnerColor = vec3(1.0);   
+
+                vec3 eyeGradientColor = mix(eyeInnerColor, eyeOuterColor, eyes.gradient);
+                return mix(finalColor, eyeGradientColor, eyes.mask);
+            } else {
+               return finalColor;
+            }
+        }
+        
+        vec3 mixPupilColor(vec3 finalColor, PupilData pupils) {
+                  if (pupils.mask > 0.0) {
+              // Colors for START emotion
+              vec3 startOuterColor = getOutterPupilEmotionColor(uStartState);
+              vec3 startInnerColor = getInnerPupilEmotionColor(uStartState);
+              vec3 startBlendedColor = mix(startOuterColor, startInnerColor, pupils.gradient);
+
+              // Colors for TARGET emotion
+              vec3 targetOuterColor = getOutterPupilEmotionColor(uTargetState);
+              vec3 targetInnerColor = getInnerPupilEmotionColor(uTargetState);
+              vec3 targetBlendedColor = mix(targetOuterColor, targetInnerColor, pupils.gradient);
+
+              // Smooth transition from start to target based on uTransitionProgress
+              vec3 pupilColor = mix(startBlendedColor, targetBlendedColor, uTransitionProgress);
+
+              // Apply pupil color to final image
+              return mix(finalColor, pupilColor, pupils.mask);
+          } else {
+              return finalColor;
+          }
+        }
     """.trimIndent()
 }

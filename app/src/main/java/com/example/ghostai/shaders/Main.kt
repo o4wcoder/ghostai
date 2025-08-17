@@ -54,11 +54,11 @@ object Main {
             // === Eye shape and position ===
             vec2 leftEye = vec2(-0.10, -0.08);
             vec2 rightEye = vec2( 0.10, -0.08);
+            
+            // === Eyes ===
             EyeData eyes = drawEyes(faceUV, leftEye, rightEye, isBlinking);
-
             // === Pupils ===
              PupilData pupils = drawPupils(faceUV, leftEye + pupilOffset, rightEye + pupilOffset, isBlinking);
-
             // === Mouth ===
              MouthData mouth = drawMouth(faceUV, iTime, isSpeaking);
 
@@ -164,55 +164,14 @@ object Main {
             // === Composite ghost over mist and moon ===
             vec3 finalColor = mix(moonColor, ghostShadedColor, ghostMask);
 
-            if (eyes.mask > 0.0) {
-                // Brighter edge for more contrast — like a recessed socket
-                vec3 eyeOuterColor = vec3(0.4, 0.45, 0.4); 
-                vec3 eyeInnerColor = vec3(1.0);   
-
-                vec3 eyeGradientColor = mix(eyeInnerColor, eyeOuterColor, eyes.gradient);
-               finalColor = mix(finalColor, eyeGradientColor, eyes.mask);
-            }
-
-          if (pupils.mask > 0.0) {
-              // Colors for START emotion
-              vec3 startOuterColor = getOutterPupilEmotionColor(uStartState);
-              vec3 startInnerColor = getInnerPupilEmotionColor(uStartState);
-              vec3 startBlendedColor = mix(startOuterColor, startInnerColor, pupils.gradient);
-
-              // Colors for TARGET emotion
-              vec3 targetOuterColor = getOutterPupilEmotionColor(uTargetState);
-              vec3 targetInnerColor = getInnerPupilEmotionColor(uTargetState);
-              vec3 targetBlendedColor = mix(targetOuterColor, targetInnerColor, pupils.gradient);
-
-              // Smooth transition from start to target based on uTransitionProgress
-              vec3 pupilColor = mix(startBlendedColor, targetBlendedColor, uTransitionProgress);
-
-              // Apply pupil color to final image
-              finalColor = mix(finalColor, pupilColor, pupils.mask);
-          }
+            finalColor = mixEyeColor(finalColor, eyes);
+            finalColor = mixPupilColor(finalColor, pupils);
 
             // === Alpha fade at ghost edges ===
             float alphaFade = smoothstep(radius, radius - 0.05, length(ellipticalUV));
             float finalAlpha = mix(1.0, ghostMask * alphaFade, ghostMask);
             
-//            vec3 lipShadowColor = vec3(0.0, 0.1, 0.0); // soft green-black shadow
-//            finalColor = mix(finalColor, lipShadowColor, 0.05 * mouth.topLipShadow);
-//            
-//            // Subtle highlight above top lip
-//            vec3 topLipColor = vec3(1.0); // white highlight
-//            finalColor = mix(finalColor, topLipColor, 0.4 * mouth.lipHighlight);
-
-            // === Subtle shadow under bottom lip ===
-            // Must be added *before* drawing the actual mouth so it layers underneath
-            vec3 lipShadowColor = vec3(0.0, 0.1, 0.0); // dark green, subtle
-            finalColor = mix(finalColor, lipShadowColor, mouth.bottomLipShadow);
-
-            if (mouth.mask > 0.0) {
-                vec3 mouthOuterColor = vec3(0.2, 0.3, 0.2);
-                vec3 mouthInnerColor = vec3(0.0);
-                vec3 mouthColor = mix(mouthInnerColor, mouthOuterColor, mouth.gradient);
-                finalColor = mix(finalColor, mouthColor, mouth.mask);
-            }
+            finalColor = mixMouthColor(finalColor, mouth);
 
             return half4(finalColor, finalAlpha);
         }
