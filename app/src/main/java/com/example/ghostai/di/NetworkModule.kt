@@ -33,7 +33,8 @@ object NetworkModule {
     ): OpenAIService {
         return OpenAIService(
             apiKey = BuildConfig.OPENAI_API_KEY,
-            client = client, application = application
+            client = client,
+            application = application,
         )
     }
 

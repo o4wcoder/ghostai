@@ -22,6 +22,7 @@ import com.example.ghostai.model.Emotion
 import com.example.ghostai.model.GhostUiState
 import com.example.ghostai.shaders.Eyes
 import com.example.ghostai.shaders.Main
+import com.example.ghostai.shaders.Moon
 import com.example.ghostai.shaders.Mouth
 import com.example.ghostai.shaders.Uniforms
 import com.example.ghostai.ui.theme.GhostAITheme
@@ -38,6 +39,7 @@ fun GhostWithMist(
 ) {
     val ghostShader = listOf(
         Uniforms.uniformDefs,
+        Moon.moon,
         Eyes.eyes,
         Mouth.mouth,
         Main.main,

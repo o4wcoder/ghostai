@@ -28,10 +28,7 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.jvm.javaio.toInputStream
-import io.ktor.utils.io.readAvailable
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
@@ -64,7 +61,7 @@ data class ChatCompletionResponse(
 class OpenAIService(
     private val apiKey: String,
     private val client: HttpClient = ktorHttpClient(),
-    private val application: Application
+    private val application: Application,
 ) {
 
     suspend fun getGhostReply(conversationHistory: List<ChatMessage>): GhostReply {
@@ -96,7 +93,6 @@ class OpenAIService(
         return parseEmotionTag(replyText.trim())
     }
 
-
     @OptIn(UnstableApi::class)
     suspend fun playStreamingTts(
         text: String,
@@ -111,7 +107,6 @@ class OpenAIService(
         }
 
         try {
-
             withContext(Dispatchers.IO) {
                 client.preparePost("https://api.openai.com/v1/audio/speech") {
                     expectSuccess = false
@@ -121,13 +116,15 @@ class OpenAIService(
                         append(HttpHeaders.AcceptEncoding, "identity") // no gzip
                     }
                     contentType(ContentType.Application.Json)
-                    setBody(buildJsonObject {
-                        put("model", "tts-1")
-                        put("voice", voice)
-                        put("input", text)
-                        put("stream", true)
-                        put("format", "mp3")
-                    })
+                    setBody(
+                        buildJsonObject {
+                            put("model", "tts-1")
+                            put("voice", voice)
+                            put("input", text)
+                            put("stream", true)
+                            put("format", "mp3")
+                        },
+                    )
                 }.execute { resp ->
                     val ct = resp.headers[HttpHeaders.ContentType] ?: ""
                     if (!resp.status.isSuccess() || !ct.startsWith("audio/")) {
@@ -156,36 +153,35 @@ class OpenAIService(
                 ExoPlayer.Builder(application)
                     .setRenderersFactory(GhostRenderersFactory(application.applicationContext))
                     .build().apply {
-                    val mediaItem = MediaItem.fromUri(tempFile.toUri())
-                    setMediaItem(mediaItem)
-                    prepare()
-                    playWhenReady = true
-                    addListener(object : Player.Listener {
-                        override fun onPlaybackStateChanged(state: Int) {
-                            when (state) {
-                                Player.STATE_READY -> {
-                                    if (playWhenReady) {
-                                        onGhostSpeechStart()
+                        val mediaItem = MediaItem.fromUri(tempFile.toUri())
+                        setMediaItem(mediaItem)
+                        prepare()
+                        playWhenReady = true
+                        addListener(object : Player.Listener {
+                            override fun onPlaybackStateChanged(state: Int) {
+                                when (state) {
+                                    Player.STATE_READY -> {
+                                        if (playWhenReady) {
+                                            onGhostSpeechStart()
+                                        }
                                     }
+                                    Player.STATE_ENDED -> {
+                                        release()
+                                        tempFile.delete()
+                                        onGhostSpeechEnd()
+                                        onComplete()
+                                    }
+                                    else -> {}
                                 }
-                                Player.STATE_ENDED -> {
-                                    release()
-                                    tempFile.delete()
-                                    onGhostSpeechEnd()
-                                    onComplete()
-                                }
-                                else -> {}
                             }
-                        }
 
-                        override fun onPlayerError(error: PlaybackException) {
-                            onError(error)
-                            release()
-                        }
-                    })
-                }
+                            override fun onPlayerError(error: PlaybackException) {
+                                onError(error)
+                                release()
+                            }
+                        })
+                    }
             }
-
         } catch (e: Exception) {
             Timber.e(e, "OpenAI TTS streaming failed")
             withContext(Dispatchers.Main) {
@@ -193,7 +189,6 @@ class OpenAIService(
             }
         }
     }
-
 
     fun parseEmotionTag(rawText: String): GhostReply {
         val regex = Regex("""^\[Emotion:\s*(\w+)]\s*(.*)""", RegexOption.IGNORE_CASE)

@@ -3,10 +3,8 @@ package com.example.ghostai
 import android.app.Application
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
-import androidx.annotation.OptIn
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.media3.common.util.UnstableApi
 import com.example.ghostai.model.ConversationState
 import com.example.ghostai.model.Emotion
 import com.example.ghostai.model.GhostReply
@@ -85,24 +83,24 @@ constructor(
                     updateGhostEmotion(reply.emotion)
 
                     // TODO: When add back ElevenLabs, but request on background thread
-                  // elevenLabsService.startStreamingSpeech(
-                        openAIService.playStreamingTts(
-                            text = reply.text,
-                            onError = {
-                                Timber.e("CGH: Streaming error: $it")
-                                updateConversationState(ConversationState.Idle)
-                                maybeRestartListening()
-                            },
-                            onGhostSpeechEnd = {
-                                Timber.d("CGH: onGhostSpeechEnd() @ ${System.currentTimeMillis()} - state ${_ghostUiState.value.conversationState}")
-                                updateConversationState(ConversationState.Idle)
-                                maybeRestartListening()
-                            },
-                            onGhostSpeechStart = {
-                                Timber.d("CGH: onGhostSpeechStart() @ ${System.currentTimeMillis()} - state ${_ghostUiState.value.conversationState}")
-                                updateConversationState(ConversationState.GhostTalking)
-                            },
-                        )
+                    // elevenLabsService.startStreamingSpeech(
+                    openAIService.playStreamingTts(
+                        text = reply.text,
+                        onError = {
+                            Timber.e("CGH: Streaming error: $it")
+                            updateConversationState(ConversationState.Idle)
+                            maybeRestartListening()
+                        },
+                        onGhostSpeechEnd = {
+                            Timber.d("CGH: onGhostSpeechEnd() @ ${System.currentTimeMillis()} - state ${_ghostUiState.value.conversationState}")
+                            updateConversationState(ConversationState.Idle)
+                            maybeRestartListening()
+                        },
+                        onGhostSpeechStart = {
+                            Timber.d("CGH: onGhostSpeechStart() @ ${System.currentTimeMillis()} - state ${_ghostUiState.value.conversationState}")
+                            updateConversationState(ConversationState.GhostTalking)
+                        },
+                    )
                 }
             }
         }

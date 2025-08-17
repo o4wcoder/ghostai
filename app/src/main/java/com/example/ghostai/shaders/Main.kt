@@ -7,7 +7,17 @@ object Main {
     val main = """
             half4 main(vec2 fragCoord) {
             vec2 uv = fragCoord / iResolution;
+            
             vec2 centered = (fragCoord - 0.5 * iResolution) / min(iResolution.x, iResolution.y);
+                      
+             MoonData moon = drawMoon(
+                 centered,
+                 vec2(0.20, -0.78), // tweak position in normalized coords
+                 0.18,              // radius (consistent circle)
+                 0.40,              // glow
+                 0.35,
+                 iTime
+             );
 
             // === Floating animation ===
             float floatOffset = 0.03 * sin(iTime * 0.7);
@@ -80,6 +90,11 @@ object Main {
             mistColor *= 1.0 - 0.3 * glowFalloff;
             mistColor += ghostGlowColor * glowFalloff * 1.5;
             
+               // add moon disc
+            vec3 moonColor = mix(mistColor, moon.color, moon.mask);
+               // add moon glow outside the disc only (keeps mist from washing out)
+            moonColor += moon.glow * GLOW_COLOR * (1.0 - moon.mask);
+            
             // === Ghost body shading (3D effect) ===
             vec3 ghostInnerColor = vec3(0.2, 1.0, 0.2);  // bright green
             vec3 ghostEdgeColor  = vec3(0.0, 0.4, 0.0);  // darker green
@@ -130,8 +145,8 @@ object Main {
             vec3 aoColor = vec3(0.0, 0.15, 0.0);
             ghostShadedColor = mix(ghostShadedColor, aoColor, aoStrength * eyeAO);
 
-            // === Composite ghost over mist ===
-            vec3 finalColor = mix(mistColor, ghostShadedColor, ghostMask);
+            // === Composite ghost over mist and moon ===
+            vec3 finalColor = mix(moonColor, ghostShadedColor, ghostMask);
 
             if (eyes.mask > 0.0) {
                 // Brighter edge for more contrast — like a recessed socket
