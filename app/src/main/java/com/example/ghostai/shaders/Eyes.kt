@@ -132,7 +132,7 @@ object Eyes {
             }
         }
         
-        vec3 mixPupilColor(vec3 finalColor, PupilData pupils) {
+        vec3 mixPupilColor(vec3 mixColor, PupilData pupils) {
                   if (pupils.mask > 0.0) {
               // Colors for START emotion
               vec3 startOuterColor = getOutterPupilEmotionColor(uStartState);
@@ -148,10 +148,45 @@ object Eyes {
               vec3 pupilColor = mix(startBlendedColor, targetBlendedColor, uTransitionProgress);
 
               // Apply pupil color to final image
-              return mix(finalColor, pupilColor, pupils.mask);
+              return mix(mixColor, pupilColor, pupils.mask);
           } else {
-              return finalColor;
+              return mixColor;
           }
         }
+        
+         vec3 mixEyeRimHighlightColor(vec3 mixColor, vec2 uv, vec2 leftEye, vec2 rightEye) {
+            vec2 aboveLeftEye = leftEye + vec2(0.0, -0.065);
+            vec2 aboveRightEye = rightEye + vec2(0.0, -0.065);
+            float highlightRadius = 0.06;
+            float eyeRimHighlight = max(
+            smoothstep(highlightRadius, 0.0, length(uv - aboveLeftEye)),
+            smoothstep(highlightRadius, 0.0, length(uv - aboveRightEye))
+            );
+            return mix(mixColor, vec3(1.0), 0.25 * eyeRimHighlight);
+        }
+        
+        vec3 mixEyeSocketColor(vec3 mixColor, vec2 uv, vec2 leftEye, vec2 rightEye) {
+            vec2 leftShadowPos = leftEye + vec2(0.0, 0.04);
+            vec2 rightShadowPos = rightEye + vec2(0.0, 0.04);
+            float shadowRadius = 0.085;
+            float leftSocketShadow = smoothstep(shadowRadius, 0.0, length(uv - leftShadowPos));
+            float rightSocketShadow = smoothstep(shadowRadius, 0.0, length(uv - rightShadowPos));
+            float eyeSocketShadow = max(leftSocketShadow, rightSocketShadow);
+            mixColor = mix(mixColor, vec3(0.0, 0.2, 0.0), 0.4 * eyeSocketShadow);
+            
+         
+            float aoRadius = 0.09;
+            float aoStrength = 0.35;
+            float leftAO = smoothstep(aoRadius, 0.05, length(uv - leftEye));
+            float rightAO = smoothstep(aoRadius, 0.05, length(uv - rightEye));
+            float eyeAO = max(leftAO, rightAO);
+            mixColor = mix(mixColor, vec3(0.0, 0.15, 0.0), aoStrength * eyeAO);
+            
+            return mixEyeRimHighlightColor(mixColor, uv, leftEye, rightEye);
+            
+        }
+        
+
+       
     """.trimIndent()
 }

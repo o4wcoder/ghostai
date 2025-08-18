@@ -114,7 +114,7 @@ object Mouth {
             return result;
         }
         
-        vec3 mixMouthColor(vec3 finalColor, MouthData mouth) {
+        vec3 mixMouthColor(vec3 mixColor, MouthData mouth) {
         //            vec3 lipShadowColor = vec3(0.0, 0.1, 0.0); // soft green-black shadow
 //            finalColor = mix(finalColor, lipShadowColor, 0.05 * mouth.topLipShadow);
 //            
@@ -125,15 +125,15 @@ object Mouth {
             // === Subtle shadow under bottom lip ===
             // Must be added *before* drawing the actual mouth so it layers underneath
             vec3 lipShadowColor = vec3(0.0, 0.1, 0.0); // dark green, subtle
-            finalColor = mix(finalColor, lipShadowColor, mouth.bottomLipShadow);
+            mixColor = mix(mixColor, lipShadowColor, mouth.bottomLipShadow);
 
             if (mouth.mask > 0.0) {
                 vec3 mouthOuterColor = vec3(0.2, 0.3, 0.2);
                 vec3 mouthInnerColor = vec3(0.0);
                 vec3 mouthColor = mix(mouthInnerColor, mouthOuterColor, mouth.gradient);
-                return mix(finalColor, mouthColor, mouth.mask);
+                return mix(mixColor, mouthColor, mouth.mask);
             } else {
-                return finalColor;
+                return mixColor;
             }
         }
     """.trimIndent()

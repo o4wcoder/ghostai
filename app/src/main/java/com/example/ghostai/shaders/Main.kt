@@ -123,32 +123,8 @@ half4 main(vec2 fragCoord) {
     float ghostDistFactor = smoothstep(0.0, radius, length(ghostUV));
     vec3 ghostShadedColor = mix(ghostInnerColor, ghostEdgeColor, ghostDistFactor);
 
-    // Socket tint
-    vec2 leftShadowPos = leftEye + vec2(0.0, 0.04);
-    vec2 rightShadowPos = rightEye + vec2(0.0, 0.04);
-    float shadowRadius = 0.085;
-    float leftSocketShadow = smoothstep(shadowRadius, 0.0, length(faceUV - leftShadowPos));
-    float rightSocketShadow = smoothstep(shadowRadius, 0.0, length(faceUV - rightShadowPos));
-    float eyeSocketShadow = max(leftSocketShadow, rightSocketShadow);
-    ghostShadedColor = mix(ghostShadedColor, vec3(0.0, 0.2, 0.0), 0.4 * eyeSocketShadow);
-
-    // Eye rim highlights
-    vec2 aboveLeftEye = leftEye + vec2(0.0, -0.065);
-    vec2 aboveRightEye = rightEye + vec2(0.0, -0.065);
-    float highlightRadius = 0.06;
-    float eyeRimHighlight = max(
-        smoothstep(highlightRadius, 0.0, length(faceUV - aboveLeftEye)),
-        smoothstep(highlightRadius, 0.0, length(faceUV - aboveRightEye))
-    );
-    ghostShadedColor = mix(ghostShadedColor, vec3(1.0), 0.25 * eyeRimHighlight);
-
-    // AO around eyes
-    float aoRadius = 0.09;
-    float aoStrength = 0.35;
-    float leftAO = smoothstep(aoRadius, 0.05, length(faceUV - leftEye));
-    float rightAO = smoothstep(aoRadius, 0.05, length(faceUV - rightEye));
-    float eyeAO = max(leftAO, rightAO);
-    ghostShadedColor = mix(ghostShadedColor, vec3(0.0, 0.15, 0.0), aoStrength * eyeAO);
+    // Socket tint and highlight
+    ghostShadedColor = mixEyeSocketColor(ghostShadedColor, faceUV, leftEye, rightEye);
 
     // === Final composite ===
     vec3 finalColor = mix(bg, ghostShadedColor, ghostMask);
