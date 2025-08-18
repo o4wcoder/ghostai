@@ -111,23 +111,20 @@ half4 main(vec2 fragCoord) {
     float groundBlend = ground.mask * (1.0 - ghostMask);
 
     // Compose ground over moon/mist
-    vec3 bg = mix(
+    vec3 bottomGround = mix(
         moonColor,
         mix(moonColor, ground.albedo, overlayStrength), // translucent dirt
         groundBlend
     );
 
     // === Ghost shading ===
-    vec3 ghostInnerColor = vec3(0.2, 1.0, 0.2);
-    vec3 ghostEdgeColor  = vec3(0.0, 0.4, 0.0);
-    float ghostDistFactor = smoothstep(0.0, radius, length(ghostUV));
-    vec3 ghostShadedColor = mix(ghostInnerColor, ghostEdgeColor, ghostDistFactor);
+    vec3 ghostShadedColor = getGhostBodyColor(radius, ghostUV);
 
     // Socket tint and highlight
     ghostShadedColor = mixEyeSocketColor(ghostShadedColor, faceUV, leftEye, rightEye);
 
     // === Final composite ===
-    vec3 finalColor = mix(bg, ghostShadedColor, ghostMask);
+    vec3 finalColor = mix(bottomGround, ghostShadedColor, ghostMask);
     finalColor = mixEyeColor(finalColor, eyes);
     finalColor = mixPupilColor(finalColor, pupils);
     finalColor = mixMouthColor(finalColor, mouth);
