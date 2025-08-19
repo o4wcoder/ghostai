@@ -37,17 +37,17 @@ half4 main(vec2 fragCoord) {
     float ghostMask = smoothstep(0.01, 0.99, ghostBody);
 
     // === Eyes / pupils ===
-    float isBlinking = isBlinking(iTime);
+    float blink = isBlinking(iTime);
     float moveCycle = floor(iTime / 3.0);
     float cycleTime = fract(iTime / 3.0);
     float moveProgress = smoothstep(0.0, 0.2, cycleTime) * (1.0 - smoothstep(0.8, 1.0, cycleTime));
     vec2 neutralOffset = vec2(0.0, 0.01);
-    vec2 pupilOffset = neutralOffset + randomPupilOffset(moveCycle) * moveProgress * (1.0 - isBlinking);
+    vec2 pupilOffset = neutralOffset + randomPupilOffset(moveCycle) * moveProgress * (1.0 - blink);
     vec2 leftEye = vec2(-0.10, -0.08);
     vec2 rightEye = vec2( 0.10, -0.08);
 
-    EyeData eyes = drawEyes(faceUV, leftEye, rightEye, isBlinking);
-    PupilData pupils = drawPupils(faceUV, leftEye + pupilOffset, rightEye + pupilOffset, isBlinking);
+    EyeData eyes = drawEyes(faceUV, leftEye, rightEye, blink);
+    PupilData pupils = drawPupils(faceUV, leftEye + pupilOffset, rightEye + pupilOffset, blink);
     MouthData mouth = drawMouth(faceUV, iTime, isSpeaking);
 
     // === Mist background ===
@@ -101,21 +101,8 @@ half4 main(vec2 fragCoord) {
     float fade = smoothstep(groundY - feather, groundY + feather, uv.y); // 0 below → 1 above
     float bottomMask = 1.0 - fade;                                       // 1 below → 0 above
     
-    // Strength of the ground “overlay” (0 = invisible, 1 = full replace)
-    float groundStrength = 0.5;  
-    
-    // If you want the dirt to be a bit translucent, set overlayStrength < 1
-    float overlayStrength = 0.9;
-
-    // Only below horizon (ground.mask) and never over the ghost
-    float groundBlend = ground.mask * (1.0 - ghostMask);
-
-    // Compose ground over moon/mist
-    vec3 bottomGround = mix(
-        moonColor,
-        mix(moonColor, ground.albedo, overlayStrength), // translucent dirt
-        groundBlend
-    );
+    // Ground 
+    vec3 bottomGround = mixGroundColor(moonColor, ground, ghostMask);
 
     // === Ghost shading ===
     vec3 ghostShadedColor = getGhostBodyColor(radius, ghostUV);
