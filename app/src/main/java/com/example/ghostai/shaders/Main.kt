@@ -42,12 +42,28 @@ half4 main(vec2 fragCoord) {
     float cycleTime = fract(iTime / 3.0);
     float moveProgress = smoothstep(0.0, 0.2, cycleTime) * (1.0 - smoothstep(0.8, 1.0, cycleTime));
     vec2 neutralOffset = vec2(0.0, 0.01);
-    vec2 pupilOffset = neutralOffset + randomPupilOffset(moveCycle) * moveProgress * (1.0 - blink);
+    //vec2 pupilOffset = neutralOffset + randomPupilOffset(moveCycle) * moveProgress * (1.0 - blink);
     vec2 leftEye = vec2(-0.10, -0.08);
     vec2 rightEye = vec2( 0.10, -0.08);
+    
+    // eye radii here must match Eyes.drawEyes()
+    vec2 eyeRad = vec2(0.065, mix(0.075, 0.005, blink));
+
+    // 1) get your random tiny motion (same idea as before)
+    vec2 rawOffset = randomPupilOffset(moveCycle) * moveProgress * (1.0 - blink);
+
+    // 2) clamp so the glow blob can’t escape the ellipse (important when blinking)
+    float glowMargin = 0.010;               // ~should be <= glowFall in Eyes.drawPupils
+    vec2 safeOffset = clampPupilOffset(rawOffset, eyeRad, glowMargin);
+
+    // 3) final offset (neutral lift is nice; keep it)
+    vec2 pupilOffset = neutralOffset + safeOffset;
+
 
     EyeData eyes = drawEyes(faceUV, leftEye, rightEye, blink);
-    PupilData pupils = drawPupils(faceUV, leftEye + pupilOffset, rightEye + pupilOffset, blink);
+    PupilData iris = drawIrisUnderlay(faceUV, leftEye, rightEye, blink);
+
+    BlackPupilData blackPupils = drawBlackPupils(faceUV, leftEye + pupilOffset, rightEye + pupilOffset, blink);
     MouthData mouth = drawMouth(faceUV, iTime, isSpeaking);
 
     // === Mist background ===
@@ -113,7 +129,8 @@ half4 main(vec2 fragCoord) {
     // === Final composite ===
     vec3 finalColor = mix(bottomGround, ghostShadedColor, ghostMask);
     finalColor = mixEyeColor(finalColor, eyes);
-    finalColor = mixPupilColor(finalColor, pupils);
+    finalColor = mixPupilColor(finalColor, iris);
+    finalColor = mixBlackPupil(finalColor, blackPupils);
     finalColor = mixMouthColor(finalColor, mouth);
 
     float alphaFade = smoothstep(radius, radius - 0.05, length(ellipticalUV));
