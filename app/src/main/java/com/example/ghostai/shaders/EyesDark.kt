@@ -28,6 +28,15 @@ vec2 eyeMaskAndRim(vec2 uv, vec2 center, vec2 radius) {
 
     return vec2(mask, rim);
 }
+// normalized pupil-space highlight dot (returns mask inside pupil)
+float pupilDot(vec2 uv, vec2 center, vec2 pupilRad, vec2 offsetN, float sizeN, float featherN) {
+    vec2 q = (uv - (center + offsetN * pupilRad)) / pupilRad;   // normalize to pupil
+    float d = length(q);
+    float dotMask   = 1.0 - smoothstep(sizeN, sizeN + featherN, d);     // soft disk
+    float inPupil   = 1.0 - smoothstep(1.0, 1.02, length((uv - center) / pupilRad));
+    return dotMask * inPupil;
+}
+
 
 
 // helper: shape the bottom-bright iris for one eye
@@ -44,7 +53,7 @@ vec2 irisForEye(vec2 p, vec2 rad, float pupilR) {
     float skirt = 1.0 - smoothstep(mid,   outer, d); // soft halo outside
 
     // vertical falloff: 0 at top → 1 at bottom (smooth, then eased)
-    float v = pow(smoothstep(-0.25, 0.70, pn.y), 1.5);
+    float v = pow(smoothstep(-0.35, 0.55, pn.y), 1.25);
 
     // side taper to avoid a full ring at far left/right
     float side = 1.0 - smoothstep(0.80, 1.05, abs(pn.x));
@@ -178,6 +187,12 @@ PupilHighlight drawPupilHighlight(vec2 uv, vec2 leftCenter, vec2 rightCenter, fl
     return h;
 }
 
+
+
+
+
+
+
         // ---- 1) Glow under the pupil (this will be passed to mixPupilColor) ----
         PupilData drawIrisGlow(vec2 uv, vec2 leftCenter, vec2 rightCenter, float isBlinking) {
             // Eye ellipse (match drawEyes)
@@ -299,15 +314,23 @@ vec3 mixPupilColor(vec3 mixColor, PupilData pupils) {
     vec3 startBlend  = mix(startOuter,  startInner,  pupils.gradient);
     vec3 targetBlend = mix(targetOuter, targetInner, pupils.gradient);
     vec3 pupilColor  = mix(startBlend,   targetBlend, uTransitionProgress);
+//
+//    // Stronger replacement where the iris exists
+//    float a = clamp(pupils.mask * 1.35, 0.0, 1.0);
+//    vec3 outCol = mix(mixColor, pupilColor, a);
+//
+//    // Subtle emission so it doesn’t get flattened by the dark socket
+//    outCol += pupilColor * (0.35 * pupils.gradient * pupils.mask);
+//
+//    return outCol;
+// make the underlay pop a bit more
+pupilColor = clamp(pupilColor * vec3(1.10, 0.90, 0.60) * 1.20, 0.0, 2.0);
+// (optional) tiny extra glow
+float a = clamp(pupils.mask * 1.25, 0.0, 1.0);
+mixColor = mix(mixColor, pupilColor, a);
+mixColor += pupilColor * (0.22 * pupils.gradient * a);
+return mixColor;
 
-    // Stronger replacement where the iris exists
-    float a = clamp(pupils.mask * 1.35, 0.0, 1.0);
-    vec3 outCol = mix(mixColor, pupilColor, a);
-
-    // Subtle emission so it doesn’t get flattened by the dark socket
-    outCol += pupilColor * (0.35 * pupils.gradient * pupils.mask);
-
-    return outCol;
 }
 
         // --- rim highlight / sockets (your same API) --------------------------
