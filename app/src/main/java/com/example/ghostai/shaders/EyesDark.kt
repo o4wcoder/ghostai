@@ -349,24 +349,134 @@ return mixColor;
             // screen blend
             return 1.0 - (1.0 - base) * (1.0 - w);
         }
+// Helper: compute bevel ring, cavity, and top-rim highlight for one eye
+void socketMasks(vec2 uv, vec2 center,
+                 float rOuter, float rimWidth, float rimFeather,
+                 float innerFeather, float ySquash,
+                 out float ring, out float cavity, out float topRim) {
 
-        vec3 mixEyeSocketColor(vec3 mixColor, vec2 uv, vec2 leftEye, vec2 rightEye) {
-            vec2 leftShadowPos  = leftEye  + vec2(0.0, 0.04);
-            vec2 rightShadowPos = rightEye + vec2(0.0, 0.04);
-            float shadowRadius = 0.085;
-            float leftSocketShadow  = smoothstep(shadowRadius, 0.0, length(uv - leftShadowPos));
-            float rightSocketShadow = smoothstep(shadowRadius, 0.0, length(uv - rightShadowPos));
-            float eyeSocketShadow = max(leftSocketShadow, rightSocketShadow);
-            mixColor = mix(mixColor, vec3(0.0, 0.2, 0.0), 0.4 * eyeSocketShadow);
+    vec2 p = vec2(uv.x - center.x, (uv.y - center.y) * ySquash);
+    float d = length(p);
+    float rInner = rOuter - rimWidth;
 
-            float aoRadius = 0.09;
-            float aoStrength = 0.35;
-            float leftAO  = smoothstep(aoRadius, 0.05, length(uv - leftEye));
-            float rightAO = smoothstep(aoRadius, 0.05, length(uv - rightEye));
-            float eyeAO = max(leftAO, rightAO);
-            mixColor = mix(mixColor, vec3(0.0, 0.15, 0.0), aoStrength * eyeAO);
+    // crisp ring between rOuter and rInner
+    float outerStep = smoothstep(rOuter,      rOuter - rimFeather, d);
+    float innerStep = smoothstep(rInner,      rInner - rimFeather, d);
+    ring = clamp(outerStep - innerStep, 0.0, 1.0);
 
-            return mixEyeRimHighlightColor(mixColor, uv, leftEye, rightEye);
-        }
+    // shallow cavity inside rInner (minimal gradient)
+    cavity = 1.0 - smoothstep(rInner, rInner - innerFeather, d);
+
+    // top highlight along the inner rim (y negative = up; flip sign if needed)
+    vec2 dir = (d > 1e-4) ? (p / d) : vec2(0.0, -1.0);
+    topRim = ring * smoothstep(0.1, 0.8, -dir.y);
+}
+
+// Eye sockets for a white ghost: beveled rim + shallow cavity, cool/neutral shade
+vec3 mixEyeSocketColor(vec3 col, vec2 uv, vec2 leftEye, vec2 rightEye) {
+    // --- tweakables ---
+    float rOuter       = 0.085;  // outer radius of socket
+    float rimWidth     = 0.018;  // thickness of bevel ring
+    float rimFeather   = 0.006;  // softness of ring edges (smaller = crisper)
+    float innerFeather = 0.010;  // softness into cavity
+    float ySquash      = 0.92;   // slight vertical ellipse
+
+    float ringL, cavL, topL;
+    float ringR, cavR, topR;
+    socketMasks(uv, leftEye,  rOuter, rimWidth, rimFeather, innerFeather, ySquash, ringL, cavL, topL);
+    socketMasks(uv, rightEye, rOuter, rimWidth, rimFeather, innerFeather, ySquash, ringR, cavR, topR);
+
+    float ring   = max(ringL, ringR);
+    float cavity = max(cavL,  cavR);
+    float top    = max(topL,  topR);
+
+    // multiplicative cool shadows (no green tint)
+    vec3 ringMul = vec3(0.85, 0.88, 0.95); // bevel darkness
+    col *= mix(vec3(1.0), ringMul, 0.55 * ring);
+
+    // subtle cool cavity (very light)
+    vec3 cavMul = vec3(0.92, 0.95, 1.02);
+    col *= mix(vec3(1.0), cavMul, 0.30 * cavity);
+
+    // tiny white highlight on top inner rim
+    col += 0.08 * top;
+
+    return col;
+}
+// Helper: beveled socket with a TOP PINCH so the rim tucks inward
+// Helper: beveled socket with a TOP-HALF PINCH driven by local Y (not just the apex)
+//void socketMasksPinched(vec2 uv, vec2 center,
+//                        float rOuter, float rimWidth, float rimFeather,
+//                        float innerFeather, float ySquash, float pinchAmt,
+//                        out float ring, out float cavity, out float topRim) {
+//
+//    vec2 p = vec2(uv.x - center.x, (uv.y - center.y) * ySquash);
+//    float d = length(p);
+//    float rInner = rOuter - rimWidth;
+//
+//    // Normalized local Y relative to the (unpinched) outer radius
+//    // y is negative upwards in your space → -yNorm is 1 near the top edge, 0 at center line
+//    float yNorm = clamp(p.y / max(rOuter, 1e-5), -1.0, 1.0);
+//    float topHalf = smoothstep(-0.95, 0.10, -yNorm);  // 1 across most of upper half → 0 near midline/below
+//
+//    // Pinch both outer & inner radii across the whole upper half
+//    float pinch = pinchAmt * topHalf;
+//    float rOuterL = rOuter * (1.0 - pinch);
+//    float rInnerL = rInner * (1.0 - pinch);
+//
+//    // --- bevel ring (crisp) ---
+//    float outerStep = smoothstep(rOuterL, rOuterL - rimFeather, d);
+//    float innerStep = smoothstep(rInnerL, rInnerL - rimFeather, d);
+//    ring = clamp(outerStep - innerStep, 0.0, 1.0);
+//
+//    // --- shallow cavity (kept subtle) ---
+//    cavity = 1.0 - smoothstep(rInnerL, rInnerL - innerFeather, d);
+//
+//    // --- small top sparkle along the inner rim (use upper-half weight) ---
+//    topRim = ring * topHalf;
+//}
+//
+//// Beveled sockets for a white ghost with top-half pinch
+//vec3 mixEyeSocketColor(vec3 col, vec2 uv, vec2 leftEye, vec2 rightEye) {
+//    float rOuter       = 0.085;
+//    float rimWidth     = 0.018;
+//    float rimFeather   = 0.004;
+//    float innerFeather = 0.010;
+//    float ySquash      = 0.92;
+//
+//    // Pinch amount across the whole upper half (good range: 0.06–0.16)
+//    float pinchAmt     = 0.12;
+//
+//    float ringL, cavL, topL;
+//    float ringR, cavR, topR;
+//    socketMasksPinched(uv, leftEye,  rOuter, rimWidth, rimFeather, innerFeather, ySquash, pinchAmt, ringL, cavL, topL);
+//    socketMasksPinched(uv, rightEye, rOuter, rimWidth, rimFeather, innerFeather, ySquash, pinchAmt, ringR, cavR, topR);
+//
+//    float ring   = max(ringL, ringR);
+//    float cavity = max(cavL,  cavR);
+//    float top    = max(topL,  topR);
+//
+//    // Cool/neutral, no green
+//    vec3 ringMul = vec3(0.85, 0.88, 0.95);
+//    col *= mix(vec3(1.0), ringMul, 0.55 * ring);
+//
+//    vec3 cavMul  = vec3(0.92, 0.95, 1.02);
+//    col *= mix(vec3(1.0), cavMul, 0.30 * cavity);
+//
+//    col += 0.08 * top;
+//    return col;
+//}
+
+
+
+
+
+
+
+
+
+
+
+
     """.trimIndent()
 }

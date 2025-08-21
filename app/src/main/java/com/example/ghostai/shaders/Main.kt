@@ -88,7 +88,7 @@ half4 main(vec2 fragCoord) {
     float ghostDist = length(ghostUV);
     float glowFalloff = smoothstep(0.5, 0.0, ghostDist);
     mistColor *= 1.0 - 0.3 * glowFalloff;
-    mistColor += ghostGlowColor * glowFalloff * 1.5;
+    //mistColor += ghostGlowColor * glowFalloff * 1.5;
 
     // === Clouds before moon composite ===
     vec2 cloudUV = (fragCoord / iResolution) * 2.2 + vec2(iTime * 0.02, iTime * 0.015);
@@ -123,10 +123,14 @@ half4 main(vec2 fragCoord) {
     vec3 bottomGround = mixGroundColor(moonColor, ground, ghostMask);
 
     // === Ghost shading ===
-    vec3 ghostShadedColor = getGhostBodyColor(radius, ghostUV);
+    //vec3 ghostShadedColor = shadeGhostBody(radius, ghostUV);
+   //vec3 ghostShadedColor = shadeGhostBody(ghostUV, radius, vec3(-0.4, 0.6, 0.7));
+vec3 ghostShadedColor = shadeGhostBody(ghostUV, radius, normalize(vec3(-0.4, -0.8, 0.5)));
+
 
     // Socket tint and highlight
     ghostShadedColor = mixEyeSocketColor(ghostShadedColor, faceUV, leftEye, rightEye);
+
 
     // === Final composite ===
     vec3 finalColor = mix(bottomGround, ghostShadedColor, ghostMask);

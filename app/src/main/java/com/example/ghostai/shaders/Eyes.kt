@@ -165,26 +165,32 @@ object Eyes {
             return mix(mixColor, vec3(1.0), 0.25 * eyeRimHighlight);
         }
         
-        vec3 mixEyeSocketColor(vec3 mixColor, vec2 uv, vec2 leftEye, vec2 rightEye) {
-            vec2 leftShadowPos = leftEye + vec2(0.0, 0.04);
-            vec2 rightShadowPos = rightEye + vec2(0.0, 0.04);
-            float shadowRadius = 0.085;
-            float leftSocketShadow = smoothstep(shadowRadius, 0.0, length(uv - leftShadowPos));
-            float rightSocketShadow = smoothstep(shadowRadius, 0.0, length(uv - rightShadowPos));
-            float eyeSocketShadow = max(leftSocketShadow, rightSocketShadow);
-            mixColor = mix(mixColor, vec3(0.0, 0.2, 0.0), 0.4 * eyeSocketShadow);
-            
-         
-            float aoRadius = 0.09;
-            float aoStrength = 0.35;
-            float leftAO = smoothstep(aoRadius, 0.05, length(uv - leftEye));
-            float rightAO = smoothstep(aoRadius, 0.05, length(uv - rightEye));
-            float eyeAO = max(leftAO, rightAO);
-            mixColor = mix(mixColor, vec3(0.0, 0.15, 0.0), aoStrength * eyeAO);
-            
-            return mixEyeRimHighlightColor(mixColor, uv, leftEye, rightEye);
-            
-        }
+ // Eye sockets for a white ghost: cool, subtle shadows (no green)
+ vec3 mixEyeSocketColor(vec3 col, vec2 uv, vec2 leftEye, vec2 rightEye) {
+     // --- soft socket shadow slightly below each eye ---
+     vec2 offset = vec2(0.0, 0.04);
+     float rShadow = 0.085;
+     float leftSock  = smoothstep(rShadow, 0.0, length(uv - (leftEye  + offset)));
+     float rightSock = smoothstep(rShadow, 0.0, length(uv - (rightEye + offset)));
+     float socket = max(leftSock, rightSock);
+
+     // multiplicative, bluish-gray shadow (moonlit), keeps whites clean
+     vec3 socketMul = vec3(0.80, 0.85, 0.95); // darker + cool
+     col *= mix(vec3(1.0), socketMul, 0.55 * socket);
+
+     // --- ambient occlusion right around the eyes ---
+     float aoRadius = 0.09;
+     float leftAO  = smoothstep(aoRadius, 0.05, length(uv - leftEye));
+     float rightAO = smoothstep(aoRadius, 0.05, length(uv - rightEye));
+     float eyeAO = max(leftAO, rightAO);
+
+     // very subtle cool AO to avoid dirty gray
+     vec3 aoMul = vec3(0.90, 0.94, 1.04);
+     col *= mix(vec3(1.0), aoMul, 0.35 * eyeAO);
+
+     return mixEyeRimHighlightColor(col, uv, leftEye, rightEye);
+ }
+
         
 
        
