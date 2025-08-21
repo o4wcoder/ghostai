@@ -6,93 +6,70 @@ object GhostBody {
     @Language("AGSL")
     val ghostBody = """
         
-//vec3 shadeGhostBody(float radius, vec2 uv) {
-//    vec3 albedo = vec3(0.98, 0.99, 1.00);
-//
-//    // Fake "height" shading – darker at bottom, lighter at top
-//    float shade = smoothstep(-radius, radius, uv.y);
-//
-//    // Add a subtle highlight bias
-//    float highlight = smoothstep(-0.3, 0.3, uv.x) * 0.2;
-//
-//    return albedo * (0.7 + 0.3 * shade + highlight);
-//}
 
-
-// Solid, 3D-looking ghost body (no edge gradient, no glow)
-//vec3 shadeGhostBody(vec2 uv, float radius, vec3 lightDir) {
-//    vec3 albedo = vec3(0.98, 0.99, 1.00);
-//
-//    // --- subtle vertical form (darker bottom -> lighter top) ---
-//    float v        = smoothstep(-radius*0.9, radius*0.5, uv.y);
-//    float vFactor  = mix(0.85, 1.05, v);  // only ~±10%
-//
-//    // --- softened directional lighting on an ellipsoid ---
-//    vec2 ellUV = vec2(uv.x, uv.y * 0.85) / max(radius, 1e-5);
-//    float r2   = dot(ellUV, ellUV);
-//    float z    = sqrt(max(0.0, 1.0 - min(r2, 1.0)));
-//    vec3 N     = normalize(vec3(ellUV, z));
-//    vec3 L     = normalize(lightDir);
-//    vec3 V     = vec3(0.0, 0.0, 1.0);
-//
-//    float diffuse = max(dot(N, L), 0.0);
-//    diffuse = mix(0.5, diffuse, 0.35);        // compress range so “dark side” never goes gray
-//    float spec    = pow(max(dot(reflect(-L, N), V), 0.0), 64.0) * 0.26;
-//
-//    float shade = 0.45 + 0.35*vFactor + 0.45*diffuse;  // mostly bright, gentle depth
-//    return albedo * shade + spec;
-//}
-
-// Solid white body with gentle 3D + top bias + cool moonlit shadows
+// Slimmer 3D body: spherical head → cylindrical bottom (no rim/edge gradient)
 vec3 shadeGhostBody(vec2 uv, float radius, vec3 lightDir) {
     vec3 albedo = vec3(1.0);
 
-    // --- ellipsoidal normal ---
-    vec2 euv = vec2(uv.x, uv.y * 0.85) / max(radius, 1e-5);
-    float r2 = dot(euv, euv);
-    float z  = sqrt(max(0.0, 1.0 - min(r2, 1.0)));
-    vec3 N   = normalize(vec3(euv, z));
+    // --- build two normals ---
+    vec2 euv = vec2(uv.x, uv.y * 0.88) / max(radius, 1e-5);
 
+    // Spherical (good for the head/crown)
+    float r2s = clamp(dot(euv, euv), 0.0, 1.0);
+    float zS  = sqrt(1.0 - r2s);
+    vec3 Ns   = normalize(vec3(euv, zS));
+
+    // Cylindrical across X only (cloth hanging straight down)
+    float x2  = clamp(euv.x * euv.x, 0.0, 1.0);
+    float zC  = sqrt(1.0 - x2);
+    vec3 Nc   = normalize(vec3(euv.x, 0.0, zC));
+
+    // Blend: sphere at top → cylinder at bottom
+    float belly = smoothstep(-0.10 * radius, 0.90 * radius, uv.y); // 0 top .. 1 bottom
+    float cylMix = 0.75 * belly;                                   // strength of slimming
+    vec3 N = normalize(mix(Ns, Nc, cylMix));
+
+    // --- lighting ---
     vec3 L = normalize(lightDir);
     vec3 V = vec3(0.0, 0.0, 1.0);
 
-    // --- soft lighting (keeps body bright) ---
-    float diffuse = max(dot(N, L), 0.0);
-    diffuse = mix(0.7, diffuse, 0.3);              // compress range so shadows never go dull
-    float spec    = pow(max(dot(reflect(-L, N), V), 0.0), 24.0) * 0.08; // soft, broad highlight
+    // Wrap diffuse (soft split)
+    float kWrap = 0.45;
+    float ndl = dot(N, L);
+    float diffuse = clamp((ndl + kWrap) / (1.0 + kWrap), 0.0, 1.0);
 
-    // --- vertical bias (independent of light) ---
-    float vTop      = smoothstep(-radius, 0.3*radius, uv.y);
-    float topBoost  = mix(1.0, 1.12, 1.0 - vTop);  // brighter head
-    float bottomSha = mix(0.95, 1.0, smoothstep(-0.2*radius, 0.9*radius, uv.y));
+    // Hemispheric ambient (cool sky above, very light ground below)
+    vec3 sky    = vec3(1.05, 1.07, 1.10);
+    vec3 ground = vec3(0.99, 0.99, 1.00);
+    float hemiT = 0.5 - 0.5 * N.y; // 1 = faces up
+    vec3 hemi   = mix(ground, sky, hemiT); // (kept implicit – helps keep it bright)
 
-    // --- base brightness (white, not gray) ---
-    float base = 0.82 + 0.35 * diffuse;
+    // Soft specular
+    vec3 H = normalize(L + V);
+    float spec = pow(max(dot(N, H), 0.0), 20.0) * 0.06;
 
-    // --- cool moonlit tint only in darker/bottom areas ---
-    vec3 coolBlue = vec3(0.90, 0.95, 1.06);        // subtle blue bias
-    float dark    = 1.0 - diffuse;                 // more tint in shadow
-    float bottom  = smoothstep(-0.1*radius, radius, uv.y); // more tint toward bottom
-    float coolAmt = 0.14 * dark * bottom;          // ~0..0.14
-    vec3 tintMul  = mix(vec3(1.0), coolBlue, coolAmt);
+    // Tiny crown sheen (keeps head lively)
+    float cap = smoothstep(-radius * 1.2, -radius * 0.2, uv.y) * smoothstep(0.2, 0.9, zS);
 
-    vec3 body = albedo * (base * topBoost * bottomSha);
-    body *= tintMul;                                // apply cool tint to shaded areas
+    // Gentle bottom AO (reduced so the belly doesn't look heavy)
+    float bottomAO = smoothstep(0.15 * radius, 0.95 * radius, uv.y);
+    vec3 aoMul = mix(vec3(1.0), vec3(0.96, 0.97, 1.00), 0.06 * bottomAO);
 
-    return body + spec;
+    // Subtle ground bounce to *lighten* bottom
+    float bounce = smoothstep(0.0, radius, uv.y);
+    vec3  bounceCol = vec3(1.02, 1.02, 1.00);
+    float bounceAmt = 0.10 * bounce;
+
+    // Compose (bright baseline so he stays white, not gray)
+    vec3 base = albedo * (0.62 + 0.45 * diffuse);
+    base *= aoMul;
+    base += 0.05 * cap;
+    base = mix(base, base * bounceCol, bounceAmt);
+
+    return clamp(base + spec, 0.0, 1.2);
 }
 
 
-
-
-
-
-
-
-
-
-
-        
             vec3 getGhostBodyColor(float radius, vec2 uv) {
             // Soft white inside
             vec3 ghostInnerColor = vec3(1.0, 1.0, 1.0);     

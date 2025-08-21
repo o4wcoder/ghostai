@@ -1,3 +1,4 @@
+
 package com.example.ghostai.shaders
 
 import org.intellij.lang.annotations.Language
@@ -26,15 +27,27 @@ half4 main(vec2 fragCoord) {
     vec2 ghostUV = centered;
     ghostUV.y += floatOffset;
     vec2 faceUV = ghostUV;
-    float tailWave = 0.05 * sin(ghostUV.x * 15.0 + iTime * 2.0);
+
+    float tailWave   = 0.05 * sin(ghostUV.x * 15.0 + iTime * 2.0);
     float tailFactor = smoothstep(0.0, 0.3, ghostUV.y);
     ghostUV.y += tailWave * tailFactor;
-    ghostUV.x *= mix(1.0, 0.4, smoothstep(0.0, 0.6, ghostUV.y));
 
-    float radius = 0.4;
-    vec2 ellipticalUV = vec2(ghostUV.x, ghostUV.y * 0.9);
-    float ghostBody = smoothstep(radius, radius - 0.1, length(ellipticalUV));
-    float ghostMask = smoothstep(0.01, 0.99, ghostBody);
+    // Bottom pinch (slimmer toward the tail)
+    ghostUV.x *= mix(1.0, 0.30, smoothstep(0.0, 0.6, ghostUV.y)); // was 0.40
+
+    // === Shape controls (size / aspect) ===
+    float radius = 0.40;     // overall size (0.36–0.40)
+    float sx = 0.75;         // width scale  (<1 = slimmer)
+    float sy = 1.06;         // height scale (>1 = taller)
+
+    // Use scaled coords for silhouette (and later for body shading)
+    vec2 shapeUV = vec2(ghostUV.x / sx, ghostUV.y / sy);
+
+    // --- CRISP ghost silhouette (~1–2px AA) ---
+    vec2 ellipticalUV = vec2(shapeUV.x, shapeUV.y * 0.90);
+    float d  = length(ellipticalUV) - radius;                       // signed distance to edge
+    float aa = 1.5 / min(iResolution.x, iResolution.y);             // AA width in UV units
+    float ghostMask = 1.0 - smoothstep(0.0, aa, d);                 // hard edge + tiny AA
 
     // === Eyes / pupils ===
     float blink = isBlinking(iTime);
@@ -42,29 +55,24 @@ half4 main(vec2 fragCoord) {
     float cycleTime = fract(iTime / 3.0);
     float moveProgress = smoothstep(0.0, 0.2, cycleTime) * (1.0 - smoothstep(0.8, 1.0, cycleTime));
     vec2 neutralOffset = vec2(0.0, 0.01);
-    //vec2 pupilOffset = neutralOffset + randomPupilOffset(moveCycle) * moveProgress * (1.0 - blink);
-    vec2 leftEye = vec2(-0.10, -0.08);
-    vec2 rightEye = vec2( 0.10, -0.08);
-    
+
+    vec2 leftEye  = vec2(-0.10, -0.18);
+    vec2 rightEye = vec2( 0.10, -0.18);
+
     // eye radii here must match Eyes.drawEyes()
     vec2 eyeRad = vec2(0.065, mix(0.075, 0.005, blink));
 
-    // 1) get your random tiny motion (same idea as before)
+    // 1) tiny random motion
     vec2 rawOffset = randomPupilOffset(moveCycle) * moveProgress * (1.0 - blink);
-
     // 2) clamp so the glow blob can’t escape the ellipse (important when blinking)
-    float glowMargin = 0.010;               // ~should be <= glowFall in Eyes.drawPupils
+    float glowMargin = 0.010;
     vec2 safeOffset = clampPupilOffset(rawOffset, eyeRad, glowMargin);
-
-    // 3) final offset (neutral lift is nice; keep it)
+    // 3) final offset
     vec2 pupilOffset = neutralOffset + safeOffset;
-
 
     EyeData eyes = drawEyes(faceUV, leftEye, rightEye, blink);
     PupilData iris = drawIrisUnderlay(faceUV, leftEye, rightEye, blink);
-    PupilHighlight pupilHighlight = drawPupilHighlight(
-    faceUV, leftEye + pupilOffset, rightEye + pupilOffset, blink);
-
+    PupilHighlight pupilHighlight = drawPupilHighlight(faceUV, leftEye + pupilOffset, rightEye + pupilOffset, blink);
     BlackPupilData blackPupils = drawBlackPupils(faceUV, leftEye + pupilOffset, rightEye + pupilOffset, blink);
     MouthData mouth = drawMouth(faceUV, iTime, isSpeaking);
 
@@ -83,12 +91,12 @@ half4 main(vec2 fragCoord) {
     float lightningMask = smoothstep(1.0, 0.4, uv.y);
     mistColor += lightning * lightningMask * vec3(0.3, 0.4, 0.5);
 
-    // Ghost glow on mist
-    vec3 ghostGlowColor = vec3(0.2 + 0.4 * isSpeaking, 1.0, 0.2 + 0.4 * isSpeaking);
-    float ghostDist = length(ghostUV);
-    float glowFalloff = smoothstep(0.5, 0.0, ghostDist);
-    mistColor *= 1.0 - 0.3 * glowFalloff;
-    //mistColor += ghostGlowColor * glowFalloff * 1.5;
+    // (No ghost glow on mist — keep crisp silhouette)
+    // vec3 ghostGlowColor = vec3(0.2 + 0.4 * isSpeaking, 1.0, 0.2 + 0.4 * isSpeaking);
+    // float ghostDist = length(ghostUV);
+    // float glowFalloff = smoothstep(0.5, 0.0, ghostDist);
+    // mistColor *= 1.0 - 0.3 * glowFalloff;
+    // mistColor += ghostGlowColor * glowFalloff * 1.5;
 
     // === Clouds before moon composite ===
     vec2 cloudUV = (fragCoord / iResolution) * 2.2 + vec2(iTime * 0.02, iTime * 0.015);
@@ -122,15 +130,15 @@ half4 main(vec2 fragCoord) {
     // Ground 
     vec3 bottomGround = mixGroundColor(moonColor, ground, ghostMask);
 
-    // === Ghost shading ===
-    //vec3 ghostShadedColor = shadeGhostBody(radius, ghostUV);
-   //vec3 ghostShadedColor = shadeGhostBody(ghostUV, radius, vec3(-0.4, 0.6, 0.7));
-vec3 ghostShadedColor = shadeGhostBody(ghostUV, radius, normalize(vec3(-0.4, -0.8, 0.5)));
-
+    // === Ghost shading (use scaled coords so lighting matches silhouette) ===
+    vec3 ghostShadedColor = shadeGhostBody(
+        shapeUV,
+        radius,
+        normalize(vec3(-0.4, -0.8, 0.5)) // top-left moonlight
+    );
 
     // Socket tint and highlight
     ghostShadedColor = mixEyeSocketColor(ghostShadedColor, faceUV, leftEye, rightEye);
-
 
     // === Final composite ===
     vec3 finalColor = mix(bottomGround, ghostShadedColor, ghostMask);
@@ -140,11 +148,11 @@ vec3 ghostShadedColor = shadeGhostBody(ghostUV, radius, normalize(vec3(-0.4, -0.
     finalColor = mixPupilHighlight(finalColor, pupilHighlight);
     finalColor = mixMouthColor(finalColor, mouth);
 
-    float alphaFade = smoothstep(radius, radius - 0.05, length(ellipticalUV));
-    float finalAlpha = mix(1.0, ghostMask * alphaFade, ghostMask);
-
+    // Frame stays opaque (no feather alpha)
+    half finalAlpha = 1.0;
     return half4(finalColor, finalAlpha);
 }
-
     """.trimIndent()
 }
+
+

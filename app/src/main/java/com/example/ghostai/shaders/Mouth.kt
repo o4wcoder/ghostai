@@ -18,7 +18,7 @@ object Mouth {
         }
         
         MouthData drawMouth(vec2 uv, float iTime, float isSpeaking) {
-            float baseMouthY = 0.08;
+            float baseMouthY = -0.02;
 
             float baseMouthHeight = 0.01;
 
@@ -124,11 +124,11 @@ object Mouth {
 
             // === Subtle shadow under bottom lip ===
             // Must be added *before* drawing the actual mouth so it layers underneath
-            vec3 lipShadowColor = vec3(0.0, 0.1, 0.0); // dark green, subtle
+            vec3 lipShadowColor = vec3(0.0, 0.0, 0.1); // dark blue, subtle
             mixColor = mix(mixColor, lipShadowColor, mouth.bottomLipShadow);
 
             if (mouth.mask > 0.0) {
-                vec3 mouthOuterColor = vec3(0.2, 0.3, 0.2);
+                vec3 mouthOuterColor = vec3(0.2, 0.2, 0.3);
                 vec3 mouthInnerColor = vec3(0.0);
                 vec3 mouthColor = mix(mouthInnerColor, mouthOuterColor, mouth.gradient);
                 return mix(mixColor, mouthColor, mouth.mask);
