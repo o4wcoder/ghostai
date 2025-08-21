@@ -91,13 +91,6 @@ half4 main(vec2 fragCoord) {
     float lightningMask = smoothstep(1.0, 0.4, uv.y);
     mistColor += lightning * lightningMask * vec3(0.3, 0.4, 0.5);
 
-    // (No ghost glow on mist — keep crisp silhouette)
-    // vec3 ghostGlowColor = vec3(0.2 + 0.4 * isSpeaking, 1.0, 0.2 + 0.4 * isSpeaking);
-    // float ghostDist = length(ghostUV);
-    // float glowFalloff = smoothstep(0.5, 0.0, ghostDist);
-    // mistColor *= 1.0 - 0.3 * glowFalloff;
-    // mistColor += ghostGlowColor * glowFalloff * 1.5;
-
     // === Clouds before moon composite ===
     vec2 cloudUV = (fragCoord / iResolution) * 2.2 + vec2(iTime * 0.02, iTime * 0.015);
     float cloudNoise = fbm(cloudUV);
