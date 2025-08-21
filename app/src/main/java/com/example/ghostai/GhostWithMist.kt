@@ -20,7 +20,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.example.ghostai.model.ConversationState
 import com.example.ghostai.model.Emotion
 import com.example.ghostai.model.GhostUiState
-import com.example.ghostai.shaders.Eyes
 import com.example.ghostai.shaders.EyesDark
 import com.example.ghostai.shaders.GhostBody
 import com.example.ghostai.shaders.Ground

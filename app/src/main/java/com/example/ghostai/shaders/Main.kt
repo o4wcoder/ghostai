@@ -62,6 +62,8 @@ half4 main(vec2 fragCoord) {
 
     EyeData eyes = drawEyes(faceUV, leftEye, rightEye, blink);
     PupilData iris = drawIrisUnderlay(faceUV, leftEye, rightEye, blink);
+    PupilHighlight pupilHighlight = drawPupilHighlight(
+    faceUV, leftEye + pupilOffset, rightEye + pupilOffset, blink);
 
     BlackPupilData blackPupils = drawBlackPupils(faceUV, leftEye + pupilOffset, rightEye + pupilOffset, blink);
     MouthData mouth = drawMouth(faceUV, iTime, isSpeaking);
@@ -131,6 +133,7 @@ half4 main(vec2 fragCoord) {
     finalColor = mixEyeColor(finalColor, eyes);
     finalColor = mixPupilColor(finalColor, iris);
     finalColor = mixBlackPupil(finalColor, blackPupils);
+    finalColor = mixPupilHighlight(finalColor, pupilHighlight);
     finalColor = mixMouthColor(finalColor, mouth);
 
     float alphaFade = smoothstep(radius, radius - 0.05, length(ellipticalUV));
