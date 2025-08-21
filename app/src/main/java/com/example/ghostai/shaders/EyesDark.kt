@@ -37,8 +37,6 @@ float pupilDot(vec2 uv, vec2 center, vec2 pupilRad, vec2 offsetN, float sizeN, f
     return dotMask * inPupil;
 }
 
-
-
 // helper: shape the bottom-bright iris for one eye
 vec2 irisForEye(vec2 p, vec2 rad, float pupilR) {
     vec2  pn = p / rad;              // normalized in eye space
@@ -51,9 +49,13 @@ vec2 irisForEye(vec2 p, vec2 rad, float pupilR) {
 
     float core  = 1.0 - smoothstep(inner, mid,   d); // strong near center
     float skirt = 1.0 - smoothstep(mid,   outer, d); // soft halo outside
+    
+    const float IRIS_FADE_TOP    = -0.85; // start of fade (more negative = reaches higher up)
+    const float IRIS_FADE_BOTTOM =  0.55; // fully bright by this Y
+    const float IRIS_FADE_GAMMA  =  0.85; // <1 = slower fade (brighter higher up), >1 = faster
 
     // vertical falloff: 0 at top → 1 at bottom (smooth, then eased)
-    float v = pow(smoothstep(-0.35, 0.55, pn.y), 1.25);
+    float v = pow(smoothstep(IRIS_FADE_TOP, IRIS_FADE_BOTTOM, pn.y), IRIS_FADE_GAMMA);
 
     // side taper to avoid a full ring at far left/right
     float side = 1.0 - smoothstep(0.80, 1.05, abs(pn.x));
@@ -186,12 +188,6 @@ PupilHighlight drawPupilHighlight(vec2 uv, vec2 leftCenter, vec2 rightCenter, fl
     h.mask = (left + right) * (1.0 - isBlinking);
     return h;
 }
-
-
-
-
-
-
 
         // ---- 1) Glow under the pupil (this will be passed to mixPupilColor) ----
         PupilData drawIrisGlow(vec2 uv, vec2 leftCenter, vec2 rightCenter, float isBlinking) {
