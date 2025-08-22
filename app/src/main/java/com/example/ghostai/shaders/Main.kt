@@ -11,14 +11,7 @@ half4 main(vec2 fragCoord) {
     vec2 centered = (fragCoord - 0.5 * iResolution) / min(iResolution.x, iResolution.y);
 
     // === Moon ===
-    MoonData moon = drawMoon(
-        centered,
-        vec2(0.20, -0.78),
-        0.18,
-        0.40,
-        0.35,
-        iTime
-    );
+    MoonData moon = drawMoon(centered, vec2(0.20, -0.78), 0.18, 0.40, 0.35, iTime);
 
     // === Floating animation ===
     float floatOffset = 0.03 * sin(iTime * 0.7);
@@ -33,21 +26,21 @@ half4 main(vec2 fragCoord) {
     ghostUV.y += tailWave * tailFactor;
 
     // Bottom pinch (slimmer toward the tail)
-    ghostUV.x *= mix(1.0, 0.30, smoothstep(0.0, 0.6, ghostUV.y)); // was 0.40
+    ghostUV.x *= mix(1.0, 0.30, smoothstep(0.0, 0.6, ghostUV.y));
 
     // === Shape controls (size / aspect) ===
-    float radius = 0.40;     // overall size (0.36–0.40)
-    float sx = 0.75;         // width scale  (<1 = slimmer)
-    float sy = 1.06;         // height scale (>1 = taller)
+    float radius = 0.40;
+    float sx = 0.75;
+    float sy = 1.06;
 
     // Use scaled coords for silhouette (and later for body shading)
     vec2 shapeUV = vec2(ghostUV.x / sx, ghostUV.y / sy);
 
     // --- CRISP ghost silhouette (~1–2px AA) ---
     vec2 ellipticalUV = vec2(shapeUV.x, shapeUV.y * 0.90);
-    float d  = length(ellipticalUV) - radius;                       // signed distance to edge
-    float aa = 1.5 / min(iResolution.x, iResolution.y);             // AA width in UV units
-    float ghostMask = 1.0 - smoothstep(0.0, aa, d);                 // hard edge + tiny AA
+    float d  = length(ellipticalUV) - radius;
+    float aa = 1.5 / min(iResolution.x, iResolution.y);
+    float ghostMask = 1.0 - smoothstep(0.0, aa, d);
 
     // === Eyes / pupils ===
     float blink = isBlinking(iTime);
@@ -59,15 +52,10 @@ half4 main(vec2 fragCoord) {
     vec2 leftEye  = vec2(-0.10, -0.18);
     vec2 rightEye = vec2( 0.10, -0.18);
 
-    // eye radii here must match Eyes.drawEyes()
     vec2 eyeRad = vec2(0.065, mix(0.075, 0.005, blink));
-
-    // 1) tiny random motion
     vec2 rawOffset = randomPupilOffset(moveCycle) * moveProgress * (1.0 - blink);
-    // 2) clamp so the glow blob can’t escape the ellipse (important when blinking)
     float glowMargin = 0.010;
     vec2 safeOffset = clampPupilOffset(rawOffset, eyeRad, glowMargin);
-    // 3) final offset
     vec2 pupilOffset = neutralOffset + safeOffset;
 
     EyeData eyes = drawEyes(faceUV, leftEye, rightEye, blink);
@@ -79,8 +67,7 @@ half4 main(vec2 fragCoord) {
     // === Mist background ===
     vec2 mistUV = uv * 3.0 + vec2(iTime * 0.08, iTime * 0.03);
     float mistNoise = fbm(mistUV);
-    float mistStrength = 0.5;
-    vec3 mistColor = vec3(0.85) * (mistNoise * mistStrength);
+    vec3 mistColor = vec3(0.85) * (mistNoise * 0.5);
 
     // Lightning
     float lightningSeed = floor(iTime * 2.0);
@@ -110,41 +97,75 @@ half4 main(vec2 fragCoord) {
     // Tiny blue scatter near halo
     float nearHalo = clamp(moon.glow * 1.3, 0.0, 1.0);
     moonColor += (1.0 - cloudFront) * nearHalo * vec3(0.02, 0.05, 0.07);
-
-    // === Ground (UV space, bottom-only, never over ghost) ===
-    float groundY = 0.82;     // raise/lower horizon in 0..1 space
-    float feather = 0.03;     // softness of horizon edge
+    // === Ground (use drawGround mask so orientation stays correct) ============
     GroundData ground = drawGround(centered, iTime);
+    vec3 withGround = mixGroundColor(moonColor, ground, ghostMask);
 
-    // Make a bottom mask ourselves; do NOT use ground.mask
-    float fade = smoothstep(groundY - feather, groundY + feather, uv.y); // 0 below → 1 above
-    float bottomMask = 1.0 - fade;                                       // 1 below → 0 above
-    
-    // Ground 
-    vec3 bottomGround = mixGroundColor(moonColor, ground, ghostMask);
+    // === Ground shadow: horizontal oval + tiny contact =======================
+    const float GROUND_LINE = 0.40;                    // must match drawGround()
+    vec3 sceneLight = normalize(vec3(+0.60, -0.85, 0.45)); // top-right
+    vec2 L2 = normalize(sceneLight.xy);
 
-    // === Ghost shading (use scaled coords so lighting matches silhouette) ===
-    vec3 ghostShadedColor = shadeGhostBody(
-        shapeUV,
-        radius,
-        normalize(vec3(-0.4, -0.8, 0.5)) // top-left moonlight
+    // vertical float you already compute above
+    // float floatOffset = 0.03 * sin(iTime * 0.7);
+
+    // tiny contact right at the horizon (anchor only; not the main shape)
+    float footX = 0.04 * sin(iTime * 0.9) + 0.015 * sin(iTime * 2.0);
+    float contact = groundContactShadowCentered(
+        centered, footX, GROUND_LINE,
+        0.75 * radius * sx,    // width
+        0.55 * radius          // fade downward
     );
 
-    // Socket tint and highlight
+    // --- Oval center offset away from the light (down + left with top-right light)
+    float offX = -L2.x * 0.35 * radius * sx;
+    float offY =  max(0.0, -L2.y) * 0.28 * radius;
+    float cx = footX + offX;
+    float cy = GROUND_LINE + offY + 0.28 * radius;   // slightly below horizon
+
+    // --- Size follows height (no pulse)
+    // Normalize the float: +1 when ghost is lower/closer, -1 when higher
+    float floatAmp = 0.03;
+    float h = clamp(floatOffset / floatAmp, -1.0, 1.0);
+
+    // Shadow scales with height: bigger/darker when ghost is closer (h>0)
+    float sizeScale = 1.0 + 0.22 * h;                 // 22% range
+    float shadowAlphaScale = 0.3; //Smaller = lighter
+    float strengthScale = shadowAlphaScale * mix(0.70, 0.95, 0.5 + 0.5*h); // darkness factor
+
+    float rx = (1.05 * radius * sx) * sizeScale;      // horizontal radius
+    float ry = (0.55 * radius)     * sizeScale;       // vertical radius
+
+    float oval = groundOvalShadowCentered(centered, cx, cy, rx, ry, 0.10 * radius);
+
+    // Combine (oval does most of the work; contact just anchors near edge)
+    float shadow = clamp(oval + 0.25 * contact, 0.0, 1.0);
+
+    // Apply only on visible ground and never over the ghost
+    float shadowMask = shadow * ground.mask * (1.0 - ghostMask);
+    withGround = mix(withGround, withGround * 0.25, strengthScale * shadowMask);
+
+    // === Ghost shading (same scene light) ====================================
+    vec3 ghostShadedColor = shadeGhostBody(shapeUV, radius, sceneLight);
     ghostShadedColor = mixEyeSocketColor(ghostShadedColor, faceUV, leftEye, rightEye);
 
-    // === Final composite ===
-    vec3 finalColor = mix(bottomGround, ghostShadedColor, ghostMask);
+    // === Final composite ======================================================
+    vec3 finalColor = mix(withGround, ghostShadedColor, ghostMask);
     finalColor = mixEyeColor(finalColor, eyes);
     finalColor = mixPupilColor(finalColor, iris);
     finalColor = mixBlackPupil(finalColor, blackPupils);
     finalColor = mixPupilHighlight(finalColor, pupilHighlight);
     finalColor = mixMouthColor(finalColor, mouth);
 
-    // Frame stays opaque (no feather alpha)
-    half finalAlpha = 1.0;
-    return half4(finalColor, finalAlpha);
+    return half4(finalColor, 1.0);
+
+
+
 }
+
+
+
+
     """.trimIndent()
 }
 
