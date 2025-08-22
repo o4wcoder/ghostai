@@ -110,7 +110,8 @@ half4 main(vec2 fragCoord) {
     // float floatOffset = 0.03 * sin(iTime * 0.7);
 
     // tiny contact right at the horizon (anchor only; not the main shape)
-    float footX = 0.04 * sin(iTime * 0.9) + 0.015 * sin(iTime * 2.0);
+    //float footX = 0.04 * sin(iTime * 0.9) + 0.015 * sin(iTime * 2.0);
+    float footX = 0.015 * sin(iTime * 0.9); 
     float contact = groundContactShadowCentered(
         centered, footX, GROUND_LINE,
         0.75 * radius * sx,    // width
@@ -129,7 +130,7 @@ half4 main(vec2 fragCoord) {
     float h = clamp(floatOffset / floatAmp, -1.0, 1.0);
 
     // Shadow scales with height: bigger/darker when ghost is closer (h>0)
-    float sizeScale = 1.0 + 0.22 * h;                 // 22% range
+    float sizeScale = 1.0 + 0.10 * h;                 // 22% range
     float shadowAlphaScale = 0.3; //Smaller = lighter
     float strengthScale = shadowAlphaScale * mix(0.70, 0.95, 0.5 + 0.5*h); // darkness factor
 
@@ -139,7 +140,7 @@ half4 main(vec2 fragCoord) {
     float oval = groundOvalShadowCentered(centered, cx, cy, rx, ry, 0.10 * radius);
 
     // Combine (oval does most of the work; contact just anchors near edge)
-    float shadow = clamp(oval + 0.25 * contact, 0.0, 1.0);
+    float shadow = clamp(oval + 0.15 * contact, 0.0, 1.0); // was + 0.25 * contact
 
     // Apply only on visible ground and never over the ghost
     float shadowMask = shadow * ground.mask * (1.0 - ghostMask);
