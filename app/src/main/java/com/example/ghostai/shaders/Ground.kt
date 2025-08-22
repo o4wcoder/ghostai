@@ -14,29 +14,61 @@ object Ground {
         const vec3 GROUND_DARK  = vec3(0.02, 0.05, 0.05);
         const vec3 GROUND_LIGHT = vec3(0.06, 0.12, 0.11);
 
-        GroundData drawGround(vec2 centered,  float t) {
-            GroundData g;
+GroundData drawGround(vec2 centered, float t) {
+    GroundData g;
 
-            // Horizon line in centered space (-1 bottom → +1 top)
-            float groundY = 0.40;
-            float feather = 0.04;
+    // Horizon / mask (unchanged)
+    float groundY = 0.40;
+    float feather = 0.04;
+    g.mask = smoothstep(groundY - feather, groundY + feather, centered.y);
 
-            g.mask = smoothstep(groundY - feather, groundY + feather, centered.y);
+    // Ground depth: 0 at horizon, 1 at bottom
+    float groundDepth = clamp((centered.y - groundY) / max(1e-5, (1.0 - groundY)), 0.0, 1.0);
 
-            // brown dirt (unmasked!)
-            vec3 baseBrown  = vec3(0.25, 0.15, 0.08);
-            vec3 lightBrown = vec3(0.42, 0.30, 0.16);
-            float n = fbm(centered * 5.5);
-            vec3 dirt = mix(baseBrown, lightBrown, n);
+    // === Path wedge (no guide lines) ========================================
+    // Use your picked perspective lane scaling
+    float laneScale = mix(0.55, 1.40, groundDepth);   // <- your values
+    float laneOuter = 0.48;                            // path edge at bottom (tweak)
+    float edgeSoft  = 0.010;                           // soften wedge edges
 
-            // tiny speckles
-            float speck = fract(sin(dot(centered * 28.0, vec2(12.9898,78.233))) * 43758.5453);
-            dirt = mix(dirt, vec3(0.17), step(0.88, speck));
+    // Outer rail x positions at this y
+    float xL = -laneOuter * laneScale;
+    float xR =  laneOuter * laneScale;
 
-            g.albedo = dirt;         // <-- not multiplied by g.mask
+    // Inside-wedge mask (1 = inside path, 0 = outside)
+    float leftGate  = smoothstep(xL - edgeSoft, xL + edgeSoft, centered.x);
+    float rightGate = 1.0 - smoothstep(xR - edgeSoft, xR + edgeSoft, centered.x);
+    float pathInside = leftGate * rightGate;
 
-            return g;
-        }
+    // Optional: have the path “reveal” a little below the horizon
+    float yStart = groundY + (1.0 - groundY) * 0.06;
+    float appear = smoothstep(yStart - 0.015, yStart + 0.015, centered.y);
+    pathInside *= appear;
+
+    // === Dirt texture (perspective divide so features narrow upward) =========
+    float persp = mix(1.0, 3.2, groundDepth);
+    vec2 groundUV = vec2(centered.x / persp, centered.y);
+
+    vec3 baseBrown  = vec3(0.25, 0.15, 0.08);
+    vec3 lightBrown = vec3(0.42, 0.30, 0.16);
+    float n = fbm(groundUV * 5.5);
+    vec3 dirt = mix(baseBrown, lightBrown, n);
+
+    float speck = fract(sin(dot(groundUV * 28.0, vec2(12.9898,78.233))) * 43758.5453);
+    dirt = mix(dirt, vec3(0.17), step(0.88, speck));
+
+    // === Black outside the wedge ============================================
+    vec3 outsideColor = vec3(0.0);
+    g.albedo = mix(outsideColor, dirt, pathInside);   // no guide lines at all
+
+    return g;
+}
+
+
+
+
+
+
 
 // p is in CENTERED coords; y increases downward.
 // Returns 0..1 (1 = darkest) just under the ghost near the horizon.
@@ -147,15 +179,6 @@ float groundOvalShadowCentered(vec2 p, float cx, float cy,
     return clamp(mask * topFade, 0.0, 1.0);
 }
 
-
-
-
-
-
-
-
-
-    
         vec3 mixGroundColor(vec3 mixColor, GroundData ground, float ghostMask) {
     
             // Strength of the ground “overlay” (0 = invisible, 1 = full replace)

@@ -159,14 +159,7 @@ half4 main(vec2 fragCoord) {
     finalColor = mixMouthColor(finalColor, mouth);
 
     return half4(finalColor, 1.0);
-
-
-
 }
-
-
-
-
     """.trimIndent()
 }
 
