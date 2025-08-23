@@ -28,13 +28,6 @@ object Moon {
         const vec3 GLOW_COLOR = vec3(0.251, 0.635, 0.757); // #40A2C1
         const float GLOW_ALPHA = 0.40;                      // halo strength
 
-        // tiny helpers
-        float hash21(vec2 p) {
-            p = fract(p * vec2(123.34, 345.45));
-            p += dot(p, p + 34.23);
-            return fract(p.x * p.y);
-        }
-
         float ring(vec2 p, vec2 c, float r) {
             return 1.0 - smoothstep(r - 0.0015, r + 0.0015, distance(p, c));
         }

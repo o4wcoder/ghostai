@@ -34,6 +34,25 @@ object Uniforms {
         float hash(vec2 p) {
             return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
         }
+        
+                // tiny helpers
+        float hash21(vec2 p) {
+            p = fract(p * vec2(123.34, 345.45));
+            p += dot(p, p + 34.23);
+            return fract(p.x * p.y);
+        }
+        
+        vec2 hash22(vec2 p){
+            float a = hash21(p);
+            float b = hash21(p + 23.17);
+            return vec2(a, b);
+        }
+        
+        // Snap a 0..1 value to N discrete steps (prevents tiny precision flips)
+        float snap01(float v, float steps) {
+            return floor(clamp(v, 0.0, 1.0) * steps + 0.5) / steps;
+        }
+
 
         float noise(vec2 p) {
             vec2 i = floor(p);

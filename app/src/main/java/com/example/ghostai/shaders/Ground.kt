@@ -11,62 +11,176 @@ object Ground {
             vec3  albedo; // base ground color
         };
 
-        const vec3 GROUND_DARK  = vec3(0.02, 0.05, 0.05);
-        const vec3 GROUND_LIGHT = vec3(0.06, 0.12, 0.11);
-
 GroundData drawGround(vec2 centered, float t) {
     GroundData g;
 
-    // Horizon / mask (unchanged)
-    float groundY = 0.40;
-    float feather = 0.04;
+    // ───────── KNOBS ─────────
+    const float groundY  = 0.48;
+    const float feather  = 0.04;
+
+    const float LANE_SCALE_H = 0.55;
+    const float LANE_SCALE_B = 1.40;
+    const float LANE_OUTER   = 0.48;
+    const float EDGE_SOFT    = 0.010;
+    const float REVEAL_FRAC  = 0.06;
+    const float REVEAL_SOFT  = 0.015;
+
+    const float PERSPECTIVE_PINCH = 3.2;
+
+    // Dirt colors / noise
+    const vec3  baseBrown   = vec3(0.25, 0.15, 0.08);
+    const vec3  lightBrown  = vec3(0.42, 0.30, 0.16);
+    const float DIRT_FREQ   = 5.5;
+
+    // Round dust flecks
+    const float DUST_FREQ   = 22.0;
+    const float DUST_RAD    = 0.035;
+    const float DUST_SOFT   = 0.020;
+    const float DUST_KEEP_TH= 0.65;   // ↑ for fewer flecks
+
+    // Rocks (appearance)
+    const float ROCK_FREQ_X        = 5.0;   // **frequency**, not fine grid
+    const float ROCK_FREQ_Y        = 10.0;
+    const float ROCK_DENSITY       = 0.30;
+    const float ROCK_SIZE_NEAR_MIN = 0.16;
+    const float ROCK_SIZE_NEAR_MAX = 0.28;
+    const float ROCK_SIZE_FAR_MIN  = 0.08;
+    const float ROCK_SIZE_FAR_MAX  = 0.16;
+    const float ROCK_EDGE_SOFT     = 0.08;
+    const float ROCK_HEIGHT_GAIN   = 1.6;
+    const float ROCK_Z_BIAS        = 0.60;
+    const float ROCK_BEVEL_EXP     = 1.25;
+    const vec3  ROCK_A             = vec3(0.36, 0.35, 0.34);
+    const vec3  ROCK_B             = vec3(0.48, 0.47, 0.45);
+    const float ROCK_SPEC_POWER    = 28.0;
+    const float ROCK_SPEC_INT      = 0.08;
+
+    // Light
+    const vec3 L = normalize(vec3(+0.60, -0.85, 0.75));
+    const vec3 V = vec3(0.0, 0.0, 1.0);
+    const vec3 H = normalize(L + V);
+    const vec3 SPEC_TINT = vec3(0.95, 0.98, 1.00);
+    const float AMBIENT_MIN = 0.12;
+
+    // ── Horizon / mask
     g.mask = smoothstep(groundY - feather, groundY + feather, centered.y);
 
-    // Ground depth: 0 at horizon, 1 at bottom
-    float groundDepth = clamp((centered.y - groundY) / max(1e-5, (1.0 - groundY)), 0.0, 1.0);
+    // === Two depth references ===============================================
+    float centeredBottomY = 0.5 * (iResolution.y / min(iResolution.x, iResolution.y));
+    const float WORLD_BOTTOM_Y = 1.0;
 
-    // === Path wedge (no guide lines) ========================================
-    // Use your picked perspective lane scaling
-    float laneScale = mix(0.55, 1.40, groundDepth);   // <- your values
-    float laneOuter = 0.48;                            // path edge at bottom (tweak)
-    float edgeSoft  = 0.010;                           // soften wedge edges
+    float screenDepth = clamp((centered.y - groundY) /
+                              max(1e-5, (centeredBottomY - groundY)), 0.0, 1.0);
+    float worldDepth  = clamp((centered.y - groundY) /
+                              max(1e-5, (WORLD_BOTTOM_Y - groundY)), 0.0, 1.0);
 
-    // Outer rail x positions at this y
-    float xL = -laneOuter * laneScale;
-    float xR =  laneOuter * laneScale;
+    // === Path wedge (visual) =================================================
+    float laneScaleVis = mix(LANE_SCALE_H, LANE_SCALE_B, worldDepth);
+    float xLvis = -LANE_OUTER * laneScaleVis;
+    float xRvis =  LANE_OUTER * laneScaleVis;
 
-    // Inside-wedge mask (1 = inside path, 0 = outside)
-    float leftGate  = smoothstep(xL - edgeSoft, xL + edgeSoft, centered.x);
-    float rightGate = 1.0 - smoothstep(xR - edgeSoft, xR + edgeSoft, centered.x);
+    float leftGate  = smoothstep(xLvis - EDGE_SOFT, xLvis + EDGE_SOFT, centered.x);
+    float rightGate = 1.0 - smoothstep(xRvis - EDGE_SOFT, xRvis + EDGE_SOFT, centered.x);
     float pathInside = leftGate * rightGate;
 
-    // Optional: have the path “reveal” a little below the horizon
-    float yStart = groundY + (1.0 - groundY) * 0.06;
-    float appear = smoothstep(yStart - 0.015, yStart + 0.015, centered.y);
+    float yStart = groundY + (centeredBottomY - groundY) * REVEAL_FRAC;
+    float appear = smoothstep(yStart - REVEAL_SOFT, yStart + REVEAL_SOFT, centered.y);
     pathInside *= appear;
 
-    // === Dirt texture (perspective divide so features narrow upward) =========
-    float persp = mix(1.0, 3.2, groundDepth);
-    vec2 groundUV = vec2(centered.x / persp, centered.y);
+    // === Dirt base ===========================================================
+    float persp = mix(1.0, PERSPECTIVE_PINCH, worldDepth);
+    vec2  groundUV = vec2(centered.x / max(persp, 1e-5), centered.y);
 
-    vec3 baseBrown  = vec3(0.25, 0.15, 0.08);
-    vec3 lightBrown = vec3(0.42, 0.30, 0.16);
-    float n = fbm(groundUV * 5.5);
-    vec3 dirt = mix(baseBrown, lightBrown, n);
+    float n = fbm(groundUV * DIRT_FREQ);
+    vec3  dirt = mix(baseBrown, lightBrown, n);
 
-    float speck = fract(sin(dot(groundUV * 28.0, vec2(12.9898,78.233))) * 43758.5453);
-    dirt = mix(dirt, vec3(0.17), step(0.88, speck));
+    // Round dust flecks (deterministic, soft)
+    vec2  gUV      = groundUV * DUST_FREQ;
+    vec2  baseCell = floor(gUV);
+    vec2  fracUV   = fract(gUV);
+    float dustMask = 0.0;
+    for (int j = -1; j <= 1; ++j) {
+        for (int i = -1; i <= 1; ++i) {
+            vec2 cid = baseCell + vec2(float(i), float(j));
+            float rx = hash21(cid + vec2(13.0, 71.0));
+            float ry = hash21(cid + vec2(29.0, 97.0));
+            vec2  c  = vec2(float(i), float(j)) + vec2(rx, ry);
+            vec2  d2 = fracUV - c;
+            float rad = DUST_RAD * (0.7 + 0.6 * hash21(cid + vec2(5.0, 11.0)));
+            float sdf = length(d2) - rad;
+            float m    = 1.0 - smoothstep(0.0, DUST_SOFT, sdf);
+            float keep = step(DUST_KEEP_TH, hash21(cid + vec2(101.0, 203.0)));
+            dustMask   = max(dustMask, m * keep);
+        }
+    }
+    dirt = mix(dirt, vec3(0.17), clamp(dustMask, 0.0, 1.0));
 
-    // === Black outside the wedge ============================================
+    vec3 groundCol = dirt;
+
+    // === ROCKS (deterministic int-cell at original frequency) ===============
+    // Normalized lateral inside wedge
+    float u = clamp((centered.x - xLvis) / max(xRvis - xLvis, 1e-5), 0.0, 1.0);
+
+    // Integer cell IDs at your rock frequencies (device-independent)
+    vec2  cellF = vec2(u * ROCK_FREQ_X, worldDepth * ROCK_FREQ_Y);
+    vec2  iCell = floor(cellF);
+    vec2  fCell = fract(cellF);
+
+    // Neighborhood so ellipses render across borders
+    for (int j = -1; j <= 1; ++j) {
+        for (int i = -1; i <= 1; ++i) {
+            vec2 id = iCell + vec2(float(i), float(j));
+
+            float r0 = hash21(id + vec2(2.73, 3.74));   // density
+            if (r0 > ROCK_DENSITY) continue;
+
+            float r1 = hash21(id + vec2(17.0,  5.0));   // jitter x
+            float r2 = hash21(id + vec2(37.0, 11.0));   // jitter y
+            float r3 = hash21(id + vec2(59.0, 23.0));   // size/var
+
+            vec2 c = vec2(float(i), float(j)) + vec2(r1, r2) * 0.80 - 0.40;
+
+            float nearR = mix(ROCK_SIZE_NEAR_MIN, ROCK_SIZE_NEAR_MAX, r3);
+            float farR  = mix(ROCK_SIZE_FAR_MIN,  ROCK_SIZE_FAR_MAX,  r3);
+            float a = mix(farR, nearR, worldDepth);
+            float b = a * mix(0.70, 1.10, r2);
+
+            vec2 rel = fCell - c;
+            vec2 e   = vec2(rel.x / max(a,1e-5), rel.y / max(b,1e-5));
+            float d3 = length(e);
+            float rim  = smoothstep(1.0, 1.0 + ROCK_EDGE_SOFT, d3);
+            float mask = 1.0 - rim;
+            if (mask <= 0.0) continue;
+
+            float dome         = pow(clamp(1.0 - d3, 0.0, 1.0), ROCK_BEVEL_EXP);
+            float slopeProfile = 4.0 * dome * (1.0 - dome);
+            vec2  dirOut       = normalize(e + 1e-6);
+            float slope        = ROCK_HEIGHT_GAIN * slopeProfile;
+            float nz           = mix(1.0, ROCK_Z_BIAS, clamp(slope * 0.6, 0.0, 1.0));
+            vec3  nrm          = normalize(vec3(dirOut * slope, nz));
+
+            vec3 rcol = mix(ROCK_A, ROCK_B, r0) * (0.98 + 0.04 * (r3 - 0.5));
+            vec3  dustTint = mix(baseBrown, lightBrown, 0.5);
+            float dustAmt  = 0.15 + 0.20 * r2;
+            dustAmt       *= mix(0.85, 1.00, worldDepth);
+            rcol           = mix(rcol, dustTint, clamp(dustAmt, 0.0, 1.0));
+
+            float NdL  = clamp(dot(nrm, L), 0.0, 1.0);
+            float diff = mix(AMBIENT_MIN, 1.0, NdL);
+            float spec = pow(max(dot(nrm, H), 0.0), ROCK_SPEC_POWER) * ROCK_SPEC_INT;
+
+            vec3 lit = rcol * diff + SPEC_TINT * spec;
+
+            groundCol = mix(groundCol, lit, clamp(mask, 0.0, 1.0));
+        }
+    }
+
+    // === Outside the wedge ===================================================
     vec3 outsideColor = vec3(0.0);
-    g.albedo = mix(outsideColor, dirt, pathInside);   // no guide lines at all
+    g.albedo = mix(outsideColor, groundCol, pathInside);
 
     return g;
 }
-
-
-
-
 
 
 

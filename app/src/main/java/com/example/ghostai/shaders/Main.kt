@@ -102,7 +102,7 @@ half4 main(vec2 fragCoord) {
     vec3 withGround = mixGroundColor(moonColor, ground, ghostMask);
 
     // === Ground shadow: horizontal oval + tiny contact =======================
-    const float GROUND_LINE = 0.40;                    // must match drawGround()
+    const float GROUND_LINE = 0.48;                    // must match drawGround()
     vec3 sceneLight = normalize(vec3(+0.60, -0.85, 0.45)); // top-right
     vec2 L2 = normalize(sceneLight.xy);
 
