@@ -10,7 +10,37 @@ object Ground {
             float mask;   // 0 sky, 1 ground
             vec3  albedo; // base ground color
         };
+        
+        
+float getDustMask(vec2  groundUV) {
+    const float DUST_FREQ   = 22.0;
+    const float DUST_RAD    = 0.035;
+    const float DUST_SOFT   = 0.020;
+    const float DUST_KEEP_TH= 0.65;
 
+    vec2  gUV      = groundUV * DUST_FREQ;
+    vec2  baseCell = floor(gUV);
+    vec2  fracUV   = fract(gUV);
+    float dustMask = 0.0;
+    for (int j = -1; j <= 1; ++j) {
+        for (int i = -1; i <= 1; ++i) {
+            vec2 cid = baseCell + vec2(float(i), float(j));
+            float rx = hash21(cid + vec2(13.0, 71.0));
+            float ry = hash21(cid + vec2(29.0, 97.0));
+            vec2  c  = vec2(float(i), float(j)) + vec2(rx, ry);
+
+            vec2  d2  = fracUV - c;
+            float rad = DUST_RAD * (0.7 + 0.6 * hash21(cid + vec2(5.0, 11.0)));
+            float sdf = length(d2) - rad;
+
+            float m    = 1.0 - smoothstep(0.0, DUST_SOFT, sdf);
+            float keep = step(DUST_KEEP_TH, hash21(cid + vec2(101.0, 203.0)));
+            dustMask   = max(dustMask, m * keep);
+        }
+    }
+    
+    return dustMask;
+}
 GroundData drawGround(vec2 centered, float t) {
     GroundData g;
 
@@ -18,6 +48,7 @@ GroundData drawGround(vec2 centered, float t) {
     const float groundY  = 0.48;
     const float feather  = 0.04;
 
+    // Path wedge / perspective
     const float LANE_SCALE_H = 0.55;
     const float LANE_SCALE_B = 1.40;
     const float LANE_OUTER   = 0.48;
@@ -32,26 +63,25 @@ GroundData drawGround(vec2 centered, float t) {
     const vec3  lightBrown  = vec3(0.42, 0.30, 0.16);
     const float DIRT_FREQ   = 5.5;
 
-    // Round dust flecks
-    const float DUST_FREQ   = 22.0;
-    const float DUST_RAD    = 0.035;
-    const float DUST_SOFT   = 0.020;
-    const float DUST_KEEP_TH= 0.65;   // ↑ for fewer flecks
-
     // Rocks (appearance)
-    const float ROCK_FREQ_X        = 5.0;   // **frequency**, not fine grid
-    const float ROCK_FREQ_Y        = 10.0;
+    const float ROCK_FREQ_X        = 5.0;   // integer-cell frequency across
+    const float ROCK_FREQ_Y        = 10.0;  // integer-cell frequency down
     const float ROCK_DENSITY       = 0.30;
     const float ROCK_SIZE_NEAR_MIN = 0.16;
     const float ROCK_SIZE_NEAR_MAX = 0.28;
     const float ROCK_SIZE_FAR_MIN  = 0.08;
     const float ROCK_SIZE_FAR_MAX  = 0.16;
     const float ROCK_EDGE_SOFT     = 0.08;
-    const float ROCK_HEIGHT_GAIN   = 1.6;
-    const float ROCK_Z_BIAS        = 0.60;
+
+    // Rock shaping / shading tweaks
+    const float ROCK_HEIGHT_GAIN   = 1.35;   // gentler sides
     const float ROCK_BEVEL_EXP     = 1.25;
+    const float ROCK_TWIST_MAX     = 0.9;    // max rotation (radians) per rock
+    const float ROCK_SKIRT_W       = 0.20;   // width of dirt AO ring (in d units)
+    const float ROCK_SKIRT_GAIN    = 0.35;   // strength of dirt AO ring
+
     const vec3  ROCK_A             = vec3(0.36, 0.35, 0.34);
-    const vec3  ROCK_B             = vec3(0.48, 0.47, 0.45);
+    const vec3  ROCK_B             = vec3(0.58, 0.57, 0.55);
     const float ROCK_SPEC_POWER    = 28.0;
     const float ROCK_SPEC_INT      = 0.08;
 
@@ -94,39 +124,18 @@ GroundData drawGround(vec2 centered, float t) {
     float n = fbm(groundUV * DIRT_FREQ);
     vec3  dirt = mix(baseBrown, lightBrown, n);
 
-    // Round dust flecks (deterministic, soft)
-    vec2  gUV      = groundUV * DUST_FREQ;
-    vec2  baseCell = floor(gUV);
-    vec2  fracUV   = fract(gUV);
-    float dustMask = 0.0;
-    for (int j = -1; j <= 1; ++j) {
-        for (int i = -1; i <= 1; ++i) {
-            vec2 cid = baseCell + vec2(float(i), float(j));
-            float rx = hash21(cid + vec2(13.0, 71.0));
-            float ry = hash21(cid + vec2(29.0, 97.0));
-            vec2  c  = vec2(float(i), float(j)) + vec2(rx, ry);
-            vec2  d2 = fracUV - c;
-            float rad = DUST_RAD * (0.7 + 0.6 * hash21(cid + vec2(5.0, 11.0)));
-            float sdf = length(d2) - rad;
-            float m    = 1.0 - smoothstep(0.0, DUST_SOFT, sdf);
-            float keep = step(DUST_KEEP_TH, hash21(cid + vec2(101.0, 203.0)));
-            dustMask   = max(dustMask, m * keep);
-        }
-    }
+    // Dust flecks (your helper)
+    float dustMask = getDustMask(groundUV);
     dirt = mix(dirt, vec3(0.17), clamp(dustMask, 0.0, 1.0));
 
     vec3 groundCol = dirt;
 
     // === ROCKS (deterministic int-cell at original frequency) ===============
-    // Normalized lateral inside wedge
     float u = clamp((centered.x - xLvis) / max(xRvis - xLvis, 1e-5), 0.0, 1.0);
-
-    // Integer cell IDs at your rock frequencies (device-independent)
     vec2  cellF = vec2(u * ROCK_FREQ_X, worldDepth * ROCK_FREQ_Y);
     vec2  iCell = floor(cellF);
     vec2  fCell = fract(cellF);
 
-    // Neighborhood so ellipses render across borders
     for (int j = -1; j <= 1; ++j) {
         for (int i = -1; i <= 1; ++i) {
             vec2 id = iCell + vec2(float(i), float(j));
@@ -137,40 +146,65 @@ GroundData drawGround(vec2 centered, float t) {
             float r1 = hash21(id + vec2(17.0,  5.0));   // jitter x
             float r2 = hash21(id + vec2(37.0, 11.0));   // jitter y
             float r3 = hash21(id + vec2(59.0, 23.0));   // size/var
+            float r4 = hash21(id + vec2(83.0, 47.0));   // rotation
+            float rCol = hash21(id + vec2(109.0, 61.0)); 
 
+            // center inside the integer cell
             vec2 c = vec2(float(i), float(j)) + vec2(r1, r2) * 0.80 - 0.40;
 
+            // Radii (bigger near bottom)
             float nearR = mix(ROCK_SIZE_NEAR_MIN, ROCK_SIZE_NEAR_MAX, r3);
             float farR  = mix(ROCK_SIZE_FAR_MIN,  ROCK_SIZE_FAR_MAX,  r3);
             float a = mix(farR, nearR, worldDepth);
             float b = a * mix(0.70, 1.10, r2);
 
-            vec2 rel = fCell - c;
-            vec2 e   = vec2(rel.x / max(a,1e-5), rel.y / max(b,1e-5));
-            float d3 = length(e);
-            float rim  = smoothstep(1.0, 1.0 + ROCK_EDGE_SOFT, d3);
+            // --- rotate rock shape for variety ---
+            float ang = (r4 - 0.5) * ROCK_TWIST_MAX;
+            float s = sin(ang), cA = cos(ang);
+            vec2 rel   = fCell - c;
+            vec2 relR  = vec2(cA*rel.x - s*rel.y, s*rel.x + cA*rel.y);
+
+            // Ellipse coords in rotated frame
+            vec2 e = vec2(relR.x / max(a,1e-5), relR.y / max(b,1e-5));
+            float d  = length(e);
+            float rim  = smoothstep(1.0, 1.0 + ROCK_EDGE_SOFT, d);
             float mask = 1.0 - rim;
             if (mask <= 0.0) continue;
 
-            float dome         = pow(clamp(1.0 - d3, 0.0, 1.0), ROCK_BEVEL_EXP);
-            float slopeProfile = 4.0 * dome * (1.0 - dome);
-            vec2  dirOut       = normalize(e + 1e-6);
-            float slope        = ROCK_HEIGHT_GAIN * slopeProfile;
-            float nz           = mix(1.0, ROCK_Z_BIAS, clamp(slope * 0.6, 0.0, 1.0));
-            vec3  nrm          = normalize(vec3(dirOut * slope, nz));
+            // ---------- Flatter-top dome ----------
+            float uedge = clamp(d, 0.0, 1.0);           // 0 center → 1 rim
+            float hcap  = pow(1.0 - uedge*uedge, 1.05); // parabolic cap (flatter top)
+            float slope = ROCK_HEIGHT_GAIN * (2.0 * uedge);
+            vec2  dirOut = normalize(e + 1e-6);
+            vec3  nrm   = normalize(vec3(dirOut * slope, 1.0));
 
-            vec3 rcol = mix(ROCK_A, ROCK_B, r0) * (0.98 + 0.04 * (r3 - 0.5));
+            // Dirt AO "skirt" just OUTSIDE the rim to seat the rock
+            float skirt = smoothstep(1.0, 1.0 + ROCK_SKIRT_W, d)
+                        - smoothstep(1.0 + ROCK_SKIRT_W, 1.0 + 2.0*ROCK_SKIRT_W, d);
+            groundCol = mix(groundCol, groundCol * (1.0 - ROCK_SKIRT_GAIN), skirt);
+
+            // Rim AO on the rock itself
+            float rimAO = mix(0.85, 1.0, 1.0 - smoothstep(0.72, 1.00, uedge));
+
+            // Base rock color + variation
+            vec3 rcol = mix(ROCK_A, ROCK_B, rCol) * (0.98 + 0.04 * (r3 - 0.5));
+
+            // Brown dirt dusting
             vec3  dustTint = mix(baseBrown, lightBrown, 0.5);
             float dustAmt  = 0.15 + 0.20 * r2;
             dustAmt       *= mix(0.85, 1.00, worldDepth);
             rcol           = mix(rcol, dustTint, clamp(dustAmt, 0.0, 1.0));
 
+            // Lighting (height-varying spec)
             float NdL  = clamp(dot(nrm, L), 0.0, 1.0);
             float diff = mix(AMBIENT_MIN, 1.0, NdL);
-            float spec = pow(max(dot(nrm, H), 0.0), ROCK_SPEC_POWER) * ROCK_SPEC_INT;
+            float specPow = mix(18.0, ROCK_SPEC_POWER, hcap);  // tighter at crown
+            float specInt = ROCK_SPEC_INT * mix(0.6, 1.0, hcap);
+            float spec    = pow(max(dot(nrm, H), 0.0), specPow) * specInt;
 
-            vec3 lit = rcol * diff + SPEC_TINT * spec;
+            vec3 lit = (rcol * diff + SPEC_TINT * spec) * rimAO;
 
+            // Blend rock over dirt
             groundCol = mix(groundCol, lit, clamp(mask, 0.0, 1.0));
         }
     }
@@ -181,6 +215,7 @@ GroundData drawGround(vec2 centered, float t) {
 
     return g;
 }
+
 
 
 
