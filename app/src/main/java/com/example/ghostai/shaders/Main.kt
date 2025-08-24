@@ -113,8 +113,8 @@ half4 main(vec2 fragCoord) {
 
 
     // === Ground (use drawGround mask so orientation stays correct) ============
-//    GroundData ground = drawGround(centered, iTime, sceneLight);
-//    vec3 withGround = mixGroundColor(moonColor, ground, ghostMask);
+    GroundData ground = drawGround(centered, iTime, sceneLight);
+    vec3 withGround = mixGroundColor(moonColor, ground, ghostMask);
 
     // === Ground shadow: horizontal oval + tiny contact =======================
     const float GROUND_LINE = 0.48;                    // must match drawGround()
@@ -160,24 +160,24 @@ half4 main(vec2 fragCoord) {
     
      // ------------------ temp for debugging -----------------------------------
 
-   vec3 finalColor = moonColor;
+  // vec3 finalColor = moonColor;
    
      // -----------------------
      
-//     float shadowMask = shadow * ground.mask * (1.0 - ghostMask);
-//     withGround = mix(withGround, withGround * 0.25, strengthScale * shadowMask);
-//
-//     // === Ghost shading (same scene light) ====================================
-//     vec3 ghostShadedColor = shadeGhostBodyStandard(shapeUV, radius,sceneLight);
-//     ghostShadedColor = mixEyeSocketColor(ghostShadedColor, faceUV, leftEye, rightEye);
-//
-//     // === Final composite ======================================================
-//     vec3 finalColor = mix(withGround, ghostShadedColor, ghostMask);
-//     finalColor = mixEyeColor(finalColor, eyes);
-//     finalColor = mixPupilColor(finalColor, iris);
-//     finalColor = mixBlackPupil(finalColor, blackPupils);
-//     finalColor = mixPupilHighlight(finalColor, pupilHighlight);
-//     finalColor = mixMouthColor(finalColor, mouth);
+     float shadowMask = shadow * ground.mask * (1.0 - ghostMask);
+     withGround = mix(withGround, withGround * 0.25, strengthScale * shadowMask);
+
+     // === Ghost shading (same scene light) ====================================
+     vec3 ghostShadedColor = shadeGhostBodyStandard(shapeUV, radius,sceneLight);
+     ghostShadedColor = mixEyeSocketColor(ghostShadedColor, faceUV, leftEye, rightEye);
+
+     // === Final composite ======================================================
+     vec3 finalColor = mix(withGround, ghostShadedColor, ghostMask);
+     finalColor = mixEyeColor(finalColor, eyes);
+     finalColor = mixPupilColor(finalColor, iris);
+     finalColor = mixBlackPupil(finalColor, blackPupils);
+     finalColor = mixPupilHighlight(finalColor, pupilHighlight);
+     finalColor = mixMouthColor(finalColor, mouth);
 
 
     return half4(finalColor, 1.0);

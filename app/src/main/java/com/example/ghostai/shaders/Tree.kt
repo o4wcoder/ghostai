@@ -262,6 +262,205 @@ void buildTree(    inout vec3 inputColor, vec2  centered,   float pxAA) {
         pxAA
     );
     
+      renderCurvedBranch(
+        inputColor,                 // inout color buffer
+        centered,                   // your world coords
+        vec2(0.40, -0.17),          // basePos: left side, on ground
+        3.64159265,                 // angle: up
+        0.55,                       // height
+        0.050,                       // width
+        radians(15.0),               // bendAngle (leans a touch right)
+        0.65,                       // bendT (bend above the middle)
+        INK,
+        pxAA
+    );
+    
+       renderCurvedBranch(
+        inputColor,                 // inout color buffer
+        centered,                   // your world coords
+        vec2(0.367, -0.165),          // basePos: left side, on ground
+        3.24159265,                 // angle: up
+        0.17,                       // height
+        0.025,                       // width
+        radians(45.0),               // bendAngle (leans a touch right)
+        0.65,                       // bendT (bend above the middle)
+        INK,
+        pxAA
+    );
+    
+        renderCurvedBranch(
+        inputColor,                 // inout color buffer
+        centered,                   // your world coords
+        vec2(0.42, -0.30),          // basePos: left side, on ground
+        2.64159265,                 // angle: up
+        0.55,                       // height
+        0.050,                       // width
+        radians(15.0),               // bendAngle (leans a touch right)
+        0.65,                       // bendT (bend above the middle)
+        INK,
+        pxAA
+    );
+    
+           renderCurvedBranch(
+        inputColor,                 // inout color buffer
+        centered,                   // your world coords
+        vec2(0.427, -0.24),          // basePos: left side, on ground
+        3.04159265,                 // angle: up
+        0.17,                       // height
+        0.025,                       // width
+        radians(-30.0),               // bendAngle (leans a touch right)
+        0.65,                       // bendT (bend above the middle)
+        INK,
+        pxAA
+    );
+    
+      renderCurvedBranch(
+        inputColor,                 // inout color buffer
+        centered,                   // your world coords
+        vec2(0.40, 0.1),          // basePos: left side, on ground
+        3.64159265,                 // angle: up
+        0.55,                       // height
+        0.080,                       // width
+        radians(15.0),               // bendAngle (leans a touch right)
+        0.65,                       // bendT (bend above the middle)
+        INK,
+        pxAA
+    );
+    
+          renderCurvedBranch(
+        inputColor,                 // inout color buffer
+        centered,                   // your world coords
+        vec2(0.352, 0.12),          // basePos: left side, on ground
+        3.24159265,                 // angle: up
+        0.17,                       // height
+        0.035,                       // width
+        radians(45.0),               // bendAngle (leans a touch right)
+        0.65,                       // bendT (bend above the middle)
+        INK,
+        pxAA
+    );
+    
+         renderCurvedBranch(
+        inputColor,                 // inout color buffer
+        centered,                   // your world coords
+        vec2(0.25, -0.165),          // basePos: left side, on ground
+        3.74159265,                 // angle: up
+        0.37,                       // height
+        0.025,                       // width
+        radians(-35.0),               // bendAngle (leans a touch right)
+        0.65,                       // bendT (bend above the middle)
+        INK,
+        pxAA
+    );
+    
+          renderCurvedBranch(
+        inputColor,                 // inout color buffer
+        centered,                   // your world coords
+        vec2(0.28, -0.39),          // basePos: left side, on ground
+        3.14159265,                 // angle: up
+        0.17,                       // height
+        0.020,                       // width
+        radians(25.0),               // bendAngle (leans a touch right)
+        0.65,                       // bendT (bend above the middle)
+        INK,
+        pxAA
+    );
+    
+              renderCurvedBranch(
+        inputColor,                 // inout color buffer
+        centered,                   // your world coords
+        vec2(0.13, -0.39),          // basePos: left side, on ground
+        3.64159265,                 // angle: up
+        0.12,                       // height
+        0.010,                       // width
+        radians(-25.0),               // bendAngle (leans a touch right)
+        0.65,                       // bendT (bend above the middle)
+        INK,
+        pxAA
+    );
+    
+              renderBranch(
+        inputColor,                 // inout color buffer
+        centered,                   // your world coords
+        vec2(0.29, -0.12),          // basePos: left side, on ground
+        3.24159265,                 // angle: up
+        0.17,                       // height
+        0.025,                       // width
+        radians(45.0),               // bendAngle (leans a touch right)
+        0.65,                       // bendT (bend above the middle)
+        INK,
+        pxAA
+    );
+    
+renderCurvedBranch(
+        inputColor,                 // inout color buffer
+        centered,                   // your world coords
+        vec2(0.20, -0.25),          // basePos: left side, on ground
+        3.04159265,                 // angle: up
+        0.20,                       // height
+        0.025,                       // width
+        radians(45.0),               // bendAngle (leans a touch right)
+        0.65,                       // bendT (bend above the middle)
+        INK,
+        pxAA
+    );
+    
+    
+         renderCurvedBranch(
+        inputColor,                 // inout color buffer
+        centered,                   // your world coords
+        vec2(0.42, 0.0),          // basePos: left side, on ground
+        2.64159265,                 // angle: up
+        0.55,                       // height
+        0.050,                       // width
+        radians(15.0),               // bendAngle (leans a touch right)
+        0.65,                       // bendT (bend above the middle)
+        INK,
+        pxAA
+    );
+    
+         renderBranch(
+        inputColor,                 // inout color buffer
+        centered,                   // your world coords
+        vec2(0.45, 0.0),          // basePos: left side, on ground
+        3.04159265,                 // angle: up
+        0.12,                       // height
+        0.013,                       // width
+        radians(-10.0),               // bendAngle (leans a touch right)
+        0.65,                       // bendT (bend above the middle)
+        INK,
+        pxAA
+    );
+    
+    
+            renderCurvedBranch(
+        inputColor,                 // inout color buffer
+        centered,                   // your world coords
+        vec2(0.50, 0.50),          // basePos: left side, on ground
+        3.44159265,                 // angle: up
+        0.4,                       // height
+        0.050,                       // width
+        radians(-25.0),               // bendAngle (leans a touch right)
+        0.65,                       // bendT (bend above the middle)
+        INK,
+        pxAA
+    );
+    
+                renderCurvedBranch(
+        inputColor,                 // inout color buffer
+        centered,                   // your world coords
+        vec2(0.30, 0.50),          // basePos: left side, on ground
+        2.84159265,                 // angle: up
+        0.4,                       // height
+        0.050,                       // width
+        radians(25.0),               // bendAngle (leans a touch right)
+        0.65,                       // bendT (bend above the middle)
+        INK,
+        pxAA
+    );
+    
+    
+    
     
 }
 
