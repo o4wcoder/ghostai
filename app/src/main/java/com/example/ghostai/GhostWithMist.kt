@@ -103,13 +103,13 @@ fun GhostWithMistPreview() {
     }
 }
 
-//@Preview(showBackground = true)
-//@Composable
-//fun GhostWithMistAngryEmotionPreview() {
+// @Preview(showBackground = true)
+// @Composable
+// fun GhostWithMistAngryEmotionPreview() {
 //    GhostAITheme {
 //        GhostWithMist(ghostUiState = getGhostUiStatePreviewUiState(targetEmotion = Emotion.Angry), time = 2.0F, modifier = Modifier.background(Color.Black), onGhostThouched = {})
 //    }
-//}
+// }
 
 fun getGhostUiStatePreviewUiState(
     conversationState: ConversationState = ConversationState.GhostTalking,

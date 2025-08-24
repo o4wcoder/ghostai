@@ -261,18 +261,18 @@ object Ground {
             float worldDepth  = clamp((centered.y - groundY) /
                                       max(1e-5, (WORLD_BOTTOM_Y - groundY)), 0.0, 1.0);
 
-            // === Path wedge (visual) =========================================
-            float laneScaleVis = mix(LANE_SCALE_H, LANE_SCALE_B, worldDepth);
-            float xLvis = -LANE_OUTER * laneScaleVis;
-            float xRvis =  LANE_OUTER * laneScaleVis;
+           float centeredHalfX = 0.5 * (iResolution.x / min(iResolution.x, iResolution.y));
 
-            float leftGate  = smoothstep(xLvis - EDGE_SOFT, xLvis + EDGE_SOFT, centered.x);
-            float rightGate = 1.0 - smoothstep(xRvis - EDGE_SOFT, xRvis + EDGE_SOFT, centered.x);
-            float pathInside = leftGate * rightGate;
+           // visible extents across the whole screen in `centered` space
+           float xLvis = -centeredHalfX;
+           float xRvis =  centeredHalfX;
 
-            float yStart = groundY + (centeredBottomY - groundY) * REVEAL_FRAC;
-            float appear = smoothstep(yStart - REVEAL_SOFT, yStart + REVEAL_SOFT, centered.y);
-            pathInside *= appear;
+           // keep the top “reveal” if you like; otherwise set appear = 1.0
+           float yStart = groundY + (centeredBottomY - groundY) * REVEAL_FRAC;
+           float appear = smoothstep(yStart - REVEAL_SOFT, yStart + REVEAL_SOFT, centered.y);
+
+           // pathInside is now ONLY a vertical (Y) gate, not a left/right wedge
+           float pathInside = appear;
 
             // === Dirt base ====================================================
             float persp = mix(1.0, PERSPECTIVE_PINCH, worldDepth);
@@ -367,9 +367,7 @@ object Ground {
             groundCol = mixGrassClumps(centered, worldDepth, xLvis, xRvis, pathInside,
                                        groundCol, lightDir);
 
-            // === Outside the wedge ===========================================
-            vec3 outsideColor = vec3(0.0);
-            g.albedo = mix(outsideColor, groundCol, pathInside);
+            g.albedo = groundCol;
             return g;
         }
 
