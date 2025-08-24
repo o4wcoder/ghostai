@@ -12,7 +12,9 @@ half4 main(vec2 fragCoord) {
 
     // === Moon ===
     const vec2 MOON_POS = vec2(0.20, -0.78);
-    MoonData moon = drawMoon(centered, MOON_POS, 0.18, 0.40, 0.35, iTime);
+    const float MOON_R   = 0.18;  // disc radius
+    const float HALO_R   = 0.40;  // glow radius
+    MoonData moon = drawMoon(centered, MOON_POS, MOON_R, HALO_R, 0.35, iTime);
     // Light from the moon
     vec3 sceneLight = sceneLightFromMoon(MOON_POS, 0.75);
     // === Floating animation ===
@@ -67,9 +69,14 @@ half4 main(vec2 fragCoord) {
     MouthData mouth = drawMouth(faceUV, iTime, isSpeaking);
 
     // === Mist background ===
-    vec2 mistUV = uv * 3.0 + vec2(iTime * 0.08, iTime * 0.03);
+    const float MIST_GAIN  = 0.30;  // <- master intensity (was ~0.5 effectively). Lower = less mist
+    const float MIST_GAMMA = 1.20;  // >1.0 compresses brights (optional)
+    vec2  mistUV    = uv * 3.0 + vec2(iTime * 0.08, iTime * 0.03);
     float mistNoise = fbm(mistUV);
-    vec3 mistColor = vec3(0.85) * (mistNoise * 0.5);
+    float mist      = pow(clamp(mistNoise, 0.0, 1.0), MIST_GAMMA);
+
+    // darker base sky with scaled mist amount
+    vec3  mistColor = vec3(0.85) * (mist * MIST_GAIN);
 
     // Lightning
     float lightningSeed = floor(iTime * 2.0);
@@ -100,15 +107,29 @@ half4 main(vec2 fragCoord) {
     float nearHalo = clamp(moon.glow * 1.3, 0.0, 1.0);
     moonColor += (1.0 - cloudFront) * nearHalo * vec3(0.02, 0.05, 0.07);
     
-    // === TREE: trunk on the left =================================================
+    // === Wide sky tint from the moon (outside the halo) =========================
+    // color + strength knobs
+    const vec3  SKY_TINT_COLOR  = vec3(0.025, 0.07, 0.10); // gentle cyan/blue
+    const float SKY_TINT_STRENGTH = 0.95;                  // overall intensity
 
+    // distance from moon in your CENTERED space
+    float dMoon = length(centered - MOON_POS);
+
+    // fades from just outside the halo to ~3× the halo radius
+    float tintFalloff = 1.0 - smoothstep(HALO_R, HALO_R * 3.0, dMoon);
+
+    // reduce under thick front clouds; never affect inside the disc
+    float tintMask = tintFalloff * (1.0 - 0.6 * cloudFront) * (1.0 - moon.mask);
+
+    // apply (additive tint)
+    moonColor += SKY_TINT_COLOR * (SKY_TINT_STRENGTH * tintMask);
     // 1) AA radius in your current space
     float pxAA = 1.5 / min(iResolution.x, iResolution.y);
 
     // 2) Near‑black ink for silhouettes
     vec3 INK = vec3(0.02);
 
-
+    // === TREE: trunk on the left =================================================
     buildTree(moonColor, centered, pxAA);
 
 

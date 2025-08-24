@@ -26,7 +26,7 @@ object Moon {
         // --- Fixed colors (match your reference) ---
         const vec3 MOON_COLOR = vec3(0.871, 0.922, 0.918); // #DEEBEA
         const vec3 GLOW_COLOR = vec3(0.251, 0.635, 0.757); // #40A2C1
-        const float GLOW_ALPHA = 0.40;                      // halo strength
+        const float GLOW_ALPHA = 0.30;                      // halo strength
 
         float ring(vec2 p, vec2 c, float r) {
             return 1.0 - smoothstep(r - 0.0015, r + 0.0015, distance(p, c));
