@@ -10,7 +10,167 @@ object Ground {
             float mask;   // 0 sky, 1 ground
             vec3  albedo; // base ground color
         };
-        
+   
+// Distance mask for one curved blade in its local frame.
+// x = along blade [0..L], y = lateral. Curve y = k * (x/L)^2.
+// Width tapers from w0 → w1. Returns 0..1 alpha with soft edge.
+float bladeMaskLocal(vec2 p, float L, float w0, float w1, float k, float soft) {
+    float x = p.x, y = p.y;
+    float gate = step(0.0, x) * step(x, L);
+    float t = clamp(x / max(L, 1e-5), 0.0, 1.0);
+    float curve = k * t * t;
+    float halfW = 0.5 * mix(w0, w1, t);
+    float d = abs(y - curve) - halfW;
+    return gate * (1.0 - smoothstep(0.0, soft, d));
+}
+
+// Upright needle tufts with bottom-seam fix.
+// centered: CENTERED coords
+// worldDepth: 0 at horizon → 1 at world bottom (stable across devices)
+// xLvis/xRvis: wedge edges
+// pathInside: ground wedge/reveal mask (0..1)
+// groundCol: current ground color to paint onto
+vec3 mixGrassClumps(
+    vec2 centered, float worldDepth,
+    float xLvis, float xRvis,
+    float pathInside,
+    vec3 groundCol
+){
+    // ─── Count / placement (main knob = GRASS_RATE) ───
+    const float GRASS_FREQ_X   = 5.0;
+    const float GRASS_FREQ_Y   = 10.0;
+    const float GRASS_RATE     = 0.25;   // ↑ for more clumps, ↓ for fewer
+
+    // ─── Blade look ───
+    const int   MAX_BLADES     = 9;
+    const float BLADES_MIN     = 4.0;
+    const float BLADES_MAX     = 7.0;
+
+    const float BASE_R         = 0.055;  // tiny base mound just to anchor
+    const float BASE_SOFT      = 0.035;
+
+    const float L_MIN          = 0.58;
+    const float L_MAX          = 0.95;
+    const float W_BASE_MIN     = 0.050;
+    const float W_BASE_MAX     = 0.075;
+    const float W_TIP          = 0.012;
+
+    const float CURVE_MAX      = 0.30;   // lateral bend at tip
+    const float CURVE_BACK_BIAS= -0.12;  // curl slightly back toward the axis
+    const float SOFT_EDGE      = 0.020;
+
+    // Upright orientation (remember: up is -Y in CENTERED coords)
+    const float UP_ANGLE       = 1.57079633; // +π/2
+    const float FAN_SPREAD     = 0.18;       // tight fan = upright feel
+    const float ROT_JITTER     = 0.12;
+    const float MAX_TILT       = 0.32;       // clamp away from sideways
+
+    // Color: dark green with a brown tint
+    const vec3  GRASS_DARK     = vec3(0.06, 0.11, 0.07);
+    const vec3  GRASS_LIGHT    = vec3(0.14, 0.22, 0.12);
+    const vec3  DIRT_TINT      = vec3(0.23, 0.17, 0.11);
+    const float GRASS_DIRT_MIX = 0.18;
+
+    // Early outs
+    if (pathInside <= 0.0 || worldDepth <= 0.0) return groundCol;
+    // Avoid the bottom seam: don’t spawn right at the world-bottom clamp
+    if (worldDepth >= 0.995) return groundCol;
+
+    // Lateral inside wedge (stable)
+    float u = clamp((centered.x - xLvis) / max(xRvis - xLvis, 1e-5), 0.0, 1.0);
+
+    // Use a Y value that never lands exactly on a cell boundary
+    float worldYForCells = min(worldDepth, 0.9995);
+    vec2  cellF = vec2(u * GRASS_FREQ_X, worldYForCells * GRASS_FREQ_Y);
+    vec2  iCell = floor(cellF);
+    vec2  fCell = fract(cellF);
+
+    // Fade blades as we approach the bottom so the cutoff is invisible
+    float bottomFade = 1.0 - smoothstep(0.985, 0.997, worldDepth);
+
+    // Neighborhood so edges render across cell borders
+    for (int j = -1; j <= 1; ++j) {
+        for (int i = -1; i <= 1; ++i) {
+            vec2 id = iCell + vec2(float(i), float(j));
+
+            // Spawn gate (count knob)
+            float rGate = hash21(id + vec2(7.0, 19.0));
+            if (rGate > GRASS_RATE) continue;
+
+            // Per-clump randoms
+            float rJx = hash21(id + vec2(11.0, 31.0));
+            float rJy = hash21(id + vec2(23.0, 53.0));
+            float rN  = hash21(id + vec2(41.0, 17.0));
+            float rRot= hash21(id + vec2(59.0, 83.0));
+            float rCol= hash21(id + vec2(109.0,61.0));
+
+            // Clump center
+            vec2 C = vec2(float(i), float(j)) + vec2(rJx, rJy) * 0.70 - 0.35;
+
+            // Base mound (tiny, feathered)
+            vec2  relBase = fCell - C;
+            float base = 1.0 - smoothstep(BASE_R, BASE_R + BASE_SOFT, length(relBase));
+            vec3  baseCol = mix(GRASS_DARK, GRASS_LIGHT, 0.25);
+            baseCol = mix(baseCol, DIRT_TINT, GRASS_DIRT_MIX);
+            groundCol = mix(groundCol, baseCol, base * pathInside * bottomFade);
+
+            // Blade count
+            float want = mix(BLADES_MIN, BLADES_MAX, rN);
+            int blades = int(clamp(floor(want + 0.5), 1.0, float(MAX_BLADES)));
+
+            // Axis near straight up with tiny clump rotation
+            float clumpAngleBase = UP_ANGLE + (rRot - 0.5) * 0.25;
+
+            for (int b = 0; b < MAX_BLADES; ++b) {
+                if (b >= blades) break;
+
+                // Per-blade params
+                float rl = hash21(id + vec2(173.0, 29.0) + float(b));
+                float rw = hash21(id + vec2(191.0, 47.0) + float(b));
+                float rc = hash21(id + vec2(211.0, 71.0) + float(b));
+                float rj = hash21(id + vec2(233.0, 89.0) + float(b));
+
+                float L  = mix(L_MIN, L_MAX, rl) * mix(0.9, 1.15, worldDepth);
+                float w0 = mix(W_BASE_MIN, W_BASE_MAX, rw);
+                float w1 = W_TIP;
+                float k  = (rc - 0.5) * 2.0 * CURVE_MAX + CURVE_BACK_BIAS;
+
+                // Fan around vertical, clamp tilt so blades don’t lie sideways
+                float fan   = ((float(b) - 0.5*(float(blades)-1.0)) * FAN_SPREAD)
+                              + (rj - 0.5) * ROT_JITTER;
+                float angRaw = clumpAngleBase + fan;
+                float ang    = UP_ANGLE + clamp(angRaw - UP_ANGLE, -MAX_TILT, +MAX_TILT);
+
+                // Rotate world→blade frame: x points UP (toward -Y), y is lateral
+                float s = sin(ang), c = cos(ang);
+                vec2 rel = fCell - C;
+                vec2 p   = vec2(c*rel.x - s*rel.y, s*rel.x + c*rel.y);
+
+                // Tapered curved blade mask (0..1), x in [0..L]
+                float m = bladeMaskLocal(p, L, w0, w1, k, SOFT_EDGE);
+                if (m <= 0.0) continue;
+
+                // Color/shading (tip brighter) + brown tint
+                float t = clamp(p.x / max(L, 1e-5), 0.0, 1.0);
+                vec3 gcol = mix(GRASS_DARK, GRASS_LIGHT, mix(0.15, 0.85, t));
+                gcol = mix(gcol, DIRT_TINT, GRASS_DIRT_MIX);
+
+                // subtle centerline darkening
+                float vein = smoothstep(0.0, 0.35, abs(p.y - k*t*t));
+                gcol *= mix(0.92, 1.0, vein);
+
+                // Composite with bottom fade
+                groundCol = mix(groundCol, gcol, m * pathInside * bottomFade);
+            }
+        }
+    }
+
+    return groundCol;
+}
+
+
+
+
         
 float getDustMask(vec2  groundUV) {
     const float DUST_FREQ   = 22.0;
@@ -41,6 +201,7 @@ float getDustMask(vec2  groundUV) {
     
     return dustMask;
 }
+
 GroundData drawGround(vec2 centered, float t) {
     GroundData g;
 
@@ -208,6 +369,10 @@ GroundData drawGround(vec2 centered, float t) {
             groundCol = mix(groundCol, lit, clamp(mask, 0.0, 1.0));
         }
     }
+    
+    groundCol = mixGrassClumps(centered, worldDepth, xLvis, xRvis, pathInside, groundCol);
+
+
 
     // === Outside the wedge ===================================================
     vec3 outsideColor = vec3(0.0);
