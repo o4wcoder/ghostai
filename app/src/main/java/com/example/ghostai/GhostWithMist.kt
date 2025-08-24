@@ -27,6 +27,7 @@ import com.example.ghostai.shaders.Lighting
 import com.example.ghostai.shaders.Main
 import com.example.ghostai.shaders.Moon
 import com.example.ghostai.shaders.Mouth
+import com.example.ghostai.shaders.Tree
 import com.example.ghostai.shaders.Uniforms
 import com.example.ghostai.ui.theme.GhostAITheme
 import com.example.ghostai.util.pointerTapEvents
@@ -44,6 +45,7 @@ fun GhostWithMist(
         Uniforms.uniformDefs,
         Lighting.lighting,
         Moon.moon,
+        Tree.tree,
         GhostBody.ghostBody,
         EyesDark.eyes,
         Mouth.mouth,

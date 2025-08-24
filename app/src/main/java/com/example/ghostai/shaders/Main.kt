@@ -99,9 +99,22 @@ half4 main(vec2 fragCoord) {
     // Tiny blue scatter near halo
     float nearHalo = clamp(moon.glow * 1.3, 0.0, 1.0);
     moonColor += (1.0 - cloudFront) * nearHalo * vec3(0.02, 0.05, 0.07);
+    
+    // === TREE: trunk on the left =================================================
+
+    // 1) AA radius in your current space
+    float pxAA = 1.5 / min(iResolution.x, iResolution.y);
+
+    // 2) Near‑black ink for silhouettes
+    vec3 INK = vec3(0.02);
+
+
+    buildTree(moonColor, centered, pxAA);
+
+
     // === Ground (use drawGround mask so orientation stays correct) ============
-    GroundData ground = drawGround(centered, iTime, sceneLight);
-    vec3 withGround = mixGroundColor(moonColor, ground, ghostMask);
+//    GroundData ground = drawGround(centered, iTime, sceneLight);
+//    vec3 withGround = mixGroundColor(moonColor, ground, ghostMask);
 
     // === Ground shadow: horizontal oval + tiny contact =======================
     const float GROUND_LINE = 0.48;                    // must match drawGround()
@@ -144,26 +157,45 @@ half4 main(vec2 fragCoord) {
 
     // Combine (oval does most of the work; contact just anchors near edge)
     float shadow = clamp(oval + 0.15 * contact, 0.0, 1.0); // was + 0.25 * contact
+    
+     // ------------------ temp for debugging -----------------------------------
 
-    // Apply only on visible ground and never over the ghost
-    float shadowMask = shadow * ground.mask * (1.0 - ghostMask);
-    withGround = mix(withGround, withGround * 0.25, strengthScale * shadowMask);
+   vec3 finalColor = moonColor;
+   
+     // -----------------------
+     
+//     float shadowMask = shadow * ground.mask * (1.0 - ghostMask);
+//     withGround = mix(withGround, withGround * 0.25, strengthScale * shadowMask);
+//
+//     // === Ghost shading (same scene light) ====================================
+//     vec3 ghostShadedColor = shadeGhostBodyStandard(shapeUV, radius,sceneLight);
+//     ghostShadedColor = mixEyeSocketColor(ghostShadedColor, faceUV, leftEye, rightEye);
+//
+//     // === Final composite ======================================================
+//     vec3 finalColor = mix(withGround, ghostShadedColor, ghostMask);
+//     finalColor = mixEyeColor(finalColor, eyes);
+//     finalColor = mixPupilColor(finalColor, iris);
+//     finalColor = mixBlackPupil(finalColor, blackPupils);
+//     finalColor = mixPupilHighlight(finalColor, pupilHighlight);
+//     finalColor = mixMouthColor(finalColor, mouth);
 
-    // === Ghost shading (same scene light) ====================================
-    vec3 ghostShadedColor = shadeGhostBodyStandard(shapeUV, radius,sceneLight);
-    ghostShadedColor = mixEyeSocketColor(ghostShadedColor, faceUV, leftEye, rightEye);
-
-    // === Final composite ======================================================
-    vec3 finalColor = mix(withGround, ghostShadedColor, ghostMask);
-    finalColor = mixEyeColor(finalColor, eyes);
-    finalColor = mixPupilColor(finalColor, iris);
-    finalColor = mixBlackPupil(finalColor, blackPupils);
-    finalColor = mixPupilHighlight(finalColor, pupilHighlight);
-    finalColor = mixMouthColor(finalColor, mouth);
 
     return half4(finalColor, 1.0);
 }
     """.trimIndent()
 }
 
-
+// float shadowMask = shadow * ground.mask * (1.0 - ghostMask);
+// withGround = mix(withGround, withGround * 0.25, strengthScale * shadowMask);
+//
+// // === Ghost shading (same scene light) ====================================
+// vec3 ghostShadedColor = shadeGhostBodyStandard(shapeUV, radius,sceneLight);
+// ghostShadedColor = mixEyeSocketColor(ghostShadedColor, faceUV, leftEye, rightEye);
+//
+// // === Final composite ======================================================
+// vec3 finalColor = mix(withGround, ghostShadedColor, ghostMask);
+// finalColor = mixEyeColor(finalColor, eyes);
+// finalColor = mixPupilColor(finalColor, iris);
+// finalColor = mixBlackPupil(finalColor, blackPupils);
+// finalColor = mixPupilHighlight(finalColor, pupilHighlight);
+// finalColor = mixMouthColor(finalColor, mouth);

@@ -35,6 +35,12 @@ object Uniforms {
             return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
         }
         
+        float hash11(float x){
+            x = fract(x * 0.1031);
+            x *= x + 33.33;
+            x *= x + x;
+            return fract(x);
+        }
                 // tiny helpers
         float hash21(vec2 p) {
             p = fract(p * vec2(123.34, 345.45));
