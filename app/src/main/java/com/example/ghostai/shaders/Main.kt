@@ -147,7 +147,7 @@ half4 main(vec2 fragCoord) {
     withGround = mix(withGround, withGround * 0.25, strengthScale * shadowMask);
 
     // === Ghost shading (same scene light) ====================================
-    vec3 ghostShadedColor = shadeGhostBody(shapeUV, radius, sceneLight);
+    vec3 ghostShadedColor = shadeGhostBodyStandard(shapeUV, radius);
     ghostShadedColor = mixEyeSocketColor(ghostShadedColor, faceUV, leftEye, rightEye);
 
     // === Final composite ======================================================

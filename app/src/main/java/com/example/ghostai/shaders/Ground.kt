@@ -112,7 +112,15 @@ vec3 mixGrassClumps(
             float base = 1.0 - smoothstep(BASE_R, BASE_R + BASE_SOFT, length(relBase));
             vec3  baseCol = mix(GRASS_DARK, GRASS_LIGHT, 0.25);
             baseCol = mix(baseCol, DIRT_TINT, GRASS_DIRT_MIX);
-            groundCol = mix(groundCol, baseCol, base * pathInside * bottomFade);
+            vec3 baseLit = shadeStandard(
+                baseCol, vec3(0.0,0.0,1.0),
+                0.95,    // rough
+                0.00,    // no specular on dirt tuft base
+                1.0,     // AO
+                1.0
+            );
+            groundCol = mix(groundCol, baseLit, base * pathInside * bottomFade);
+
 
             // Blade count
             float want = mix(BLADES_MIN, BLADES_MAX, rN);
@@ -160,7 +168,17 @@ vec3 mixGrassClumps(
                 gcol *= mix(0.92, 1.0, vein);
 
                 // Composite with bottom fade
-                groundCol = mix(groundCol, gcol, m * pathInside * bottomFade);
+                vec3 Nblade = vec3(0.0, 0.0, 1.0);  // treat blade as a card; cheap and effective
+                vec3 litGrass = shadeStandard(
+                    gcol,
+                    Nblade,
+                    0.95,    // very rough = no visible spec
+                    0.00,    // specular off for grass
+                    1.0,     // AO
+                    1.0
+                );
+                groundCol = mix(groundCol, litGrass, m * pathInside * bottomFade);
+
             }
         }
     }
@@ -246,13 +264,6 @@ GroundData drawGround(vec2 centered, float t) {
     const float ROCK_SPEC_POWER    = 28.0;
     const float ROCK_SPEC_INT      = 0.08;
 
-    // Light
-    const vec3 L = normalize(vec3(+0.60, -0.85, 0.75));
-    const vec3 V = vec3(0.0, 0.0, 1.0);
-    const vec3 H = normalize(L + V);
-    const vec3 SPEC_TINT = vec3(0.95, 0.98, 1.00);
-    const float AMBIENT_MIN = 0.12;
-
     // ── Horizon / mask
     g.mask = smoothstep(groundY - feather, groundY + feather, centered.y);
 
@@ -289,7 +300,16 @@ GroundData drawGround(vec2 centered, float t) {
     float dustMask = getDustMask(groundUV);
     dirt = mix(dirt, vec3(0.17), clamp(dustMask, 0.0, 1.0));
 
-    vec3 groundCol = dirt;
+    vec3 Nflat = vec3(0.0, 0.0, 1.0);                 // flat ground normal
+    vec3 groundCol = shadeStandard(
+        dirt,      // albedo
+        Nflat,     // normal
+        0.90,      // roughness (matte dirt)
+        0.02,      // specular intensity (tiny)
+        1.0,       // AO
+        1.0        // shadow factor (you can plumb a cast-shadow later)
+    );
+
 
     // === ROCKS (deterministic int-cell at original frequency) ===============
     float u = clamp((centered.x - xLvis) / max(xRvis - xLvis, 1e-5), 0.0, 1.0);
@@ -357,13 +377,28 @@ GroundData drawGround(vec2 centered, float t) {
             rcol           = mix(rcol, dustTint, clamp(dustAmt, 0.0, 1.0));
 
             // Lighting (height-varying spec)
-            float NdL  = clamp(dot(nrm, L), 0.0, 1.0);
-            float diff = mix(AMBIENT_MIN, 1.0, NdL);
-            float specPow = mix(18.0, ROCK_SPEC_POWER, hcap);  // tighter at crown
-            float specInt = ROCK_SPEC_INT * mix(0.6, 1.0, hcap);
-            float spec    = pow(max(dot(nrm, H), 0.0), specPow) * specInt;
+//            float NdL  = clamp(dot(nrm, L), 0.0, 1.0);
+//            float diff = mix(AMBIENT_MIN, 1.0, NdL);
+//            float specPow = mix(18.0, ROCK_SPEC_POWER, hcap);  // tighter at crown
+//            float specInt = ROCK_SPEC_INT * mix(0.6, 1.0, hcap);
+//            float spec    = pow(max(dot(nrm, H), 0.0), specPow) * specInt;
+//
+//            vec3 lit = (rcol * diff + SPEC_TINT * spec) * rimAO;
+// Height-varying roughness/spec (tighter highlight near the crown)
+float rough    = mix(0.65, 0.45, hcap);
+float specular = ROCK_SPEC_INT * mix(0.60, 1.00, hcap);
 
-            vec3 lit = (rcol * diff + SPEC_TINT * spec) * rimAO;
+// Use the shared lighting; fold rim AO into the AO term
+vec3 lit = shadeStandard(
+    rcol,    // albedo (already dust-tinted)
+    nrm,     // per-rock normal
+    rough,
+    specular,
+    rimAO,   // ambient occlusion toward the rim
+    1.0      // shadow factor; plumb ground cast shadow here if desired
+);
+
+
 
             // Blend rock over dirt
             groundCol = mix(groundCol, lit, clamp(mask, 0.0, 1.0));
@@ -493,23 +528,12 @@ float groundOvalShadowCentered(vec2 p, float cx, float cy,
     return clamp(mask * topFade, 0.0, 1.0);
 }
 
-        vec3 mixGroundColor(vec3 mixColor, GroundData ground, float ghostMask) {
-    
-            // Strength of the ground “overlay” (0 = invisible, 1 = full replace)
-            float groundStrength = 0.5;  
-    
-            // If you want the dirt to be a bit translucent, set overlayStrength < 1
-            float overlayStrength = 0.9;
+vec3 mixGroundColor(vec3 bgColor, GroundData ground, float ghostMask) {
+    // GroundData.albedo now holds a FINAL LIT COLOR
+    float a = ground.mask * (1.0 - ghostMask);   // only below horizon, never over ghost
+    return mix(bgColor, ground.albedo, a);
+}
 
-            // Only below horizon (ground.mask) and never over the ghost
-            float groundBlend = ground.mask * (1.0 - ghostMask);
-    
-            return mix(
-               mixColor,
-               mix(mixColor, ground.albedo, overlayStrength), // translucent dirt
-               groundBlend
-               );
-        }
 
 
     """.trimIndent()
