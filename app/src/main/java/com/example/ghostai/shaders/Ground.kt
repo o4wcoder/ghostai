@@ -206,7 +206,7 @@ object Ground {
             return dustMask;
         }
 
-        GroundData drawGround(vec2 centered, float t, vec3 lightDir) {
+        GroundData drawGround(vec2 centered, float t, vec3 lightDir, vec2 ghostGroundCenter) {
             GroundData g;
 
             // ───────── KNOBS ─────────
@@ -366,6 +366,29 @@ object Ground {
             // Grass on top
             groundCol = mixGrassClumps(centered, worldDepth, xLvis, xRvis, pathInside,
                                        groundCol, lightDir);
+                                       
+                                       
+            // === Global ground darkening ================================================
+            // A) radial falloff away from the ghost’s ground center
+            // radius range in your CENTERED space (screen-size independent-ish)
+            const float RAD_START = 0.30;   // start fading ~just outside the ghost
+            const float RAD_END   = 1.10;   // fully applied near screen edges
+            float rN = smoothstep(RAD_START, RAD_END, length(centered - ghostGroundCenter));
+
+            // B) horizon darkening (0 at bottom → 1 near horizon)
+            float horizonN = smoothstep(0.35, 1.00, 1.0 - worldDepth);
+
+            // Strength knobs (mix to taste)
+            const float RAD_STRENGTH     = 0.55;  // far from ghost
+            const float HORIZON_STRENGTH = 0.90;  // toward the trees
+
+            // Combine (cap so we never crush the dirt completely)
+            float darkAmt = clamp(RAD_STRENGTH * rN + HORIZON_STRENGTH * horizonN, 0.0, 1.0);
+            float maxDark = 0.60;                    // how dark the darkest gets (0..1)
+            float dark    = maxDark * darkAmt;
+
+            // Multiply toward black; affects dirt, rocks, grass uniformly
+            groundCol = mix(groundCol, vec3(0.0), dark);
 
             g.albedo = groundCol;
             return g;

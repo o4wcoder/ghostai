@@ -131,14 +131,21 @@ half4 main(vec2 fragCoord) {
 
     // === TREE: trunk on the left =================================================
     buildTree(moonColor, centered, pxAA);
-
-
-    // === Ground (use drawGround mask so orientation stays correct) ============
-    GroundData ground = drawGround(centered, iTime, sceneLight);
-    vec3 withGround = mixGroundColor(moonColor, ground, ghostMask);
+    
 
     // === Ground shadow: horizontal oval + tiny contact =======================
     const float GROUND_LINE = 0.48;                    // must match drawGround()
+    float footX = 0.015 * sin(iTime * 0.9);
+    
+    // slight push below the horizon so the “center” is inside the dirt
+    vec2 ghostGroundCenter = vec2(footX, GROUND_LINE + 0.28 * radius);
+    
+        // === Ground (use drawGround mask so orientation stays correct) ============
+    GroundData ground = drawGround(centered, iTime, sceneLight, ghostGroundCenter);
+    vec3 withGround = mixGroundColor(moonColor, ground, ghostMask);
+
+
+    
     // Ground shadow uses same XY; shallower Z for projection
     vec3 sceneLightShadow = normalize(vec3(sceneLight.xy, 0.45));
     vec2 L2 = normalize(sceneLightShadow.xy);
@@ -147,8 +154,6 @@ half4 main(vec2 fragCoord) {
     // float floatOffset = 0.03 * sin(iTime * 0.7);
 
     // tiny contact right at the horizon (anchor only; not the main shape)
-    //float footX = 0.04 * sin(iTime * 0.9) + 0.015 * sin(iTime * 2.0);
-    float footX = 0.015 * sin(iTime * 0.9); 
     float contact = groundContactShadowCentered(
         centered, footX, GROUND_LINE,
         0.75 * radius * sx,    // width
