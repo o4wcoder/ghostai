@@ -13,6 +13,13 @@ object Lighting {
 
         // fast x^8 spec (cheap) — swap to pow(dot(N,H), power) later if you like
         float spec8(float x){ x = max(x, 0.0); x*=x; x*=x; return x*x; }
+        
+        // CENTERED coords; y grows downward; +z is toward camera.
+        vec3 sceneLightFromMoon(vec2 moonPos, float towardCam) {
+            vec2 d2 = normalize(moonPos - vec2(0.0));     // center → moon
+            return normalize(vec3(d2.x, d2.y, abs(towardCam)));
+        }
+
 
         // Uniform lambert + Blinn-ish spec, with AO and shadow factor
         vec3 shadeStandard(vec3 albedo, vec3 N,
@@ -34,30 +41,44 @@ object Lighting {
             return albedo * diff + SCENE_SPEC_TINT * s;
         }
         
-        // Use the same elliptical silhouette you already use for the mask:
-        // ellipticalUV = vec2(shapeUV.x, shapeUV.y * 0.90);
-        // radius = your ghost radius
+        // Same as your shadeStandard, but with explicit lightDir.
+        vec3 shadeStandardLD(vec3 albedo, vec3 N,
+                             float roughness, float specular,
+                             float ao, float shadow,
+                             vec3 lightDir)
+        {
+            vec3 L = normalize(lightDir);
+            vec3 H = normalize(L + vec3(0,0,1));
+            float NdL = clamp(dot(N, L), 0.0, 1.0);
 
-        vec3 shadeGhostBodyStandard(vec2 shapeUV, float radius) {
-            // Rebuild the same ellipse used for the mask so normals line up
-            vec2 e = vec2(shapeUV.x, shapeUV.y * 0.90);
-            float r = max(radius, 1e-5);
-            vec2  p = e / r;                          // -1..1 disk inside the ghost
-            float r2 = dot(p, p);
-            float z  = sqrt(clamp(1.0 - r2, 0.0, 1.0)); // hemisphere toward camera
+            // globals you already have:
+            // const float SCENE_AMBIENT;
+            // const vec3  SCENE_SPEC_TINT;
+            float diff = mix(SCENE_AMBIENT, 1.0, NdL) * ao * shadow;
 
-            // Slight forward bias so the rim doesn’t go flat
-            vec3 N = normalize(vec3(p.x, p.y, z * 1.35));
+            // cheap x^8 spec (or use pow if you prefer)
+            float x = max(dot(N, H), 0.0); x*=x; x*=x; float s = x*x; // ^8
+            float tight = 1.0 - clamp(roughness, 0.0, 1.0);
+            s *= specular * (0.5 + 0.5*tight) * shadow;
 
-            // Ghost material
-            vec3  albedo = vec3(0.94, 0.96, 1.00);    // soft white with tiny blue hint
-            float rough  = 0.85;                      // very matte
-            float spec   = 0.06;                      // tiny soft spec
-            float ao     = mix(0.78, 1.0, z);         // darker toward rim = subtle rim AO
-            float shadow = 1.0;                       // you can pass a cast-shadow factor later
-
-            return shadeStandard(albedo, N, rough, spec, ao, shadow);
+            return albedo * diff + SCENE_SPEC_TINT * s;
         }
+
+        
+vec3 shadeGhostBodyStandard(vec2 shapeUV, float radius, vec3 lightDir) {
+    vec2 e = vec2(shapeUV.x, shapeUV.y * 0.90);
+    vec2 p = e / max(radius, 1e-5);
+    float z = sqrt(max(0.0, 1.0 - dot(p,p)));
+    vec3  N = normalize(vec3(p.x, p.y, z * 1.35));
+
+    vec3  albedo = vec3(0.94, 0.96, 1.00);
+    float rough  = 0.85;
+    float spec   = 0.06;
+    float ao     = mix(0.78, 1.0, z);
+
+    return shadeStandardLD(albedo, N, rough, spec, ao, 1.0, lightDir);
+}
+
 
 
     """.trimIndent()

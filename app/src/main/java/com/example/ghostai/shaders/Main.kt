@@ -11,8 +11,10 @@ half4 main(vec2 fragCoord) {
     vec2 centered = (fragCoord - 0.5 * iResolution) / min(iResolution.x, iResolution.y);
 
     // === Moon ===
-    MoonData moon = drawMoon(centered, vec2(0.20, -0.78), 0.18, 0.40, 0.35, iTime);
-
+    const vec2 MOON_POS = vec2(0.20, -0.78);
+    MoonData moon = drawMoon(centered, MOON_POS, 0.18, 0.40, 0.35, iTime);
+    // Light from the moon
+    vec3 sceneLight = sceneLightFromMoon(MOON_POS, 0.75);
     // === Floating animation ===
     float floatOffset = 0.03 * sin(iTime * 0.7);
 
@@ -98,13 +100,14 @@ half4 main(vec2 fragCoord) {
     float nearHalo = clamp(moon.glow * 1.3, 0.0, 1.0);
     moonColor += (1.0 - cloudFront) * nearHalo * vec3(0.02, 0.05, 0.07);
     // === Ground (use drawGround mask so orientation stays correct) ============
-    GroundData ground = drawGround(centered, iTime);
+    GroundData ground = drawGround(centered, iTime, sceneLight);
     vec3 withGround = mixGroundColor(moonColor, ground, ghostMask);
 
     // === Ground shadow: horizontal oval + tiny contact =======================
     const float GROUND_LINE = 0.48;                    // must match drawGround()
-    vec3 sceneLight = normalize(vec3(+0.60, -0.85, 0.45)); // top-right
-    vec2 L2 = normalize(sceneLight.xy);
+    // Ground shadow uses same XY; shallower Z for projection
+    vec3 sceneLightShadow = normalize(vec3(sceneLight.xy, 0.45));
+    vec2 L2 = normalize(sceneLightShadow.xy);
 
     // vertical float you already compute above
     // float floatOffset = 0.03 * sin(iTime * 0.7);
@@ -147,7 +150,7 @@ half4 main(vec2 fragCoord) {
     withGround = mix(withGround, withGround * 0.25, strengthScale * shadowMask);
 
     // === Ghost shading (same scene light) ====================================
-    vec3 ghostShadedColor = shadeGhostBodyStandard(shapeUV, radius);
+    vec3 ghostShadedColor = shadeGhostBodyStandard(shapeUV, radius,sceneLight);
     ghostShadedColor = mixEyeSocketColor(ghostShadedColor, faceUV, leftEye, rightEye);
 
     // === Final composite ======================================================
