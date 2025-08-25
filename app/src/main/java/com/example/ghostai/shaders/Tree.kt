@@ -458,21 +458,7 @@ renderCurvedBranch(
         INK,
         pxAA
     );
-    
-    
-    
-    
 }
-
-
-
-
-        
-
-
-
-        
-        
 
     """.trimIndent()
 }
