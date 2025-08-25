@@ -231,9 +231,9 @@ object Ground {
             // Rocks (appearance)
             const float ROCK_FREQ_X        = 5.0;   // integer-cell freq across
             const float ROCK_FREQ_Y        = 10.0;  // integer-cell freq down
-            const float ROCK_DENSITY       = 0.30;
+            const float ROCK_DENSITY       = 0.25;
             const float ROCK_SIZE_NEAR_MIN = 0.16;
-            const float ROCK_SIZE_NEAR_MAX = 0.28;
+            const float ROCK_SIZE_NEAR_MAX = 0.30;
             const float ROCK_SIZE_FAR_MIN  = 0.08;
             const float ROCK_SIZE_FAR_MAX  = 0.16;
             const float ROCK_EDGE_SOFT     = 0.08;
@@ -371,16 +371,17 @@ object Ground {
             // === Global ground darkening ================================================
             // A) radial falloff away from the ghost’s ground center
             // radius range in your CENTERED space (screen-size independent-ish)
-            const float RAD_START = 0.30;   // start fading ~just outside the ghost
-            const float RAD_END   = 1.10;   // fully applied near screen edges
+            const float RAD_START = 0.45;   // start fading ~just outside the ghost
+            const float RAD_END   = 1.05;   // fully applied near screen edges
             float rN = smoothstep(RAD_START, RAD_END, length(centered - ghostGroundCenter));
-
+            rN = pow(rN, 1.6); // 1.3–2.0 = softer center, darker very edges
+            
             // B) horizon darkening (0 at bottom → 1 near horizon)
             float horizonN = smoothstep(0.35, 1.00, 1.0 - worldDepth);
 
             // Strength knobs (mix to taste)
-            const float RAD_STRENGTH     = 0.55;  // far from ghost
-            const float HORIZON_STRENGTH = 0.90;  // toward the trees
+            const float RAD_STRENGTH     = 0.18;  // far from ghost
+            const float HORIZON_STRENGTH = 0.85;  // toward the trees
 
             // Combine (cap so we never crush the dirt completely)
             float darkAmt = clamp(RAD_STRENGTH * rN + HORIZON_STRENGTH * horizonN, 0.0, 1.0);
