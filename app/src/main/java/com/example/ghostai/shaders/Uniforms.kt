@@ -12,16 +12,6 @@ object Uniforms {
         uniform float uTargetState;
         uniform float uTransitionProgress;
 
-        struct EyeData {
-            float mask;
-            float gradient;
-        };
-
-        struct PupilData {
-            float mask;
-            float gradient;
-        };
-
         struct MouthData {
             float mask;
             float gradient;
