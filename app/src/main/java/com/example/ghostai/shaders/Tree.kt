@@ -21,76 +21,74 @@ float sdTaperedCapsule(vec2 p, vec2 a, vec2 b, float ra, float rb){
     vec2  c   = pa - ba * h;
     return length(c) - r;
 }
-// add this helper
+
 float sdCircle(vec2 p, vec2 c, float r) {
     return length(p - c) - r;
 }
+
 // Polynomial smooth min (rounds both sides of the joint)
 // k ~ radius of smoothing (in your 'centered' units)
 float smin(float a, float b, float k){
     float h = clamp(0.5 + 0.5*(b - a) / max(k, 1e-6), 0.0, 1.0);
     return mix(b, a, h) - k * h * (1.0 - h);
 }
+
+// Quadratic Bézier bits
 vec2 qbez(vec2 A, vec2 C, vec2 B, float t){
     float u = 1.0 - t;
     return u*u*A + 2.0*u*t*C + t*t*B;
 }
-vec2 qbez_d1(vec2 A, vec2 C, vec2 B, float t){           // first derivative
+vec2 qbez_d1(vec2 A, vec2 C, vec2 B, float t){
     return 2.0*(mix(C, B, t) - mix(A, C, t));
 }
-vec2 qbez_d2(vec2 A, vec2 C, vec2 B){                    // second derivative
+vec2 qbez_d2(vec2 A, vec2 C, vec2 B){
     return 2.0*(B - 2.0*C + A);
 }
 
-// Closest t on a quadratic Bézier to point P (few cheap Newton steps)
-float closestTOnQuadratic(vec2 P, vec2 A, vec2 C, vec2 B){
-    // Start from chord projection
-    vec2  AB   = B - A;
-    float t    = clamp(dot(P - A, AB) / max(dot(AB, AB), 1e-6), 0.0, 1.0);
-    // 3 Newton iterations (fast & stable for this use)
-    for (int i = 0; i < 3; i++){
-        vec2  Pt = qbez(A,C,B,t) - P;
-        vec2  d1 = qbez_d1(A,C,B,t);
-        vec2  d2 = qbez_d2(A,C,B);
-        float f  = dot(Pt, d1);
-        float fp = dot(d1, d1) + dot(Pt, d2);
-        t -= f / max(fp, 1e-6);
-        t = clamp(t, 0.0, 1.0);
-    }
-    return t;
+// === FAST closest t on a quadratic Bézier to point P (1 Newton iter) =========
+// Keeps your chord projection seed; does a single stable Newton step.
+// This is ~3× cheaper than the original 3 iterations and looks the same at AA.
+float closestTOnQuadraticFast(vec2 P, vec2 A, vec2 C, vec2 B){
+    vec2 AB = B - A;
+    float t = clamp(dot(P - A, AB) / max(dot(AB, AB), 1e-6), 0.0, 1.0);
+    // 1 Newton iteration (good enough for branch tubes)
+    vec2  Pt = qbez(A,C,B,t) - P;
+    vec2  d1 = qbez_d1(A,C,B,t);
+    vec2  d2 = qbez_d2(A,C,B);
+    float f  = dot(Pt, d1);
+    float fp = dot(d1, d1) + dot(Pt, d2);
+    t -= f / max(fp, 1e-6);
+    return clamp(t, 0.0, 1.0);
 }
 
 // Distance to a tapered quadratic tube (radius blends ra→rb along t)
-float sdQuadraticTube(vec2 p, vec2 A, vec2 C, vec2 B, float ra, float rb){
-    float t = closestTOnQuadratic(p, A, C, B);
+float sdQuadraticTubeFast(vec2 p, vec2 A, vec2 C, vec2 B, float ra, float rb){
+    float t = closestTOnQuadraticFast(p, A, C, B);
     vec2  q = qbez(A, C, B, t);
     float r = mix(ra, rb, t);
     return length(p - q) - r;
 }
 
+// Coarse bbox test for 3 points (triangle) with padding rPad
+bool outsideBBoxTri(vec2 P, vec2 A, vec2 C, vec2 B, float rPad){
+    float minx = min(min(A.x, C.x), B.x) - rPad;
+    float maxx = max(max(A.x, C.x), B.x) + rPad;
+    float miny = min(min(A.y, C.y), B.y) - rPad;
+    float maxy = max(max(A.y, C.y), B.y) + rPad;
+    return (P.x < minx || P.x > maxx || P.y < miny || P.y > maxy);
+}
 
-
+// Coarse bbox test for 2 points (segment) with padding rPad
+bool outsideBBoxSeg(vec2 P, vec2 A, vec2 B, float rPad){
+    float minx = min(A.x, B.x) - rPad;
+    float maxx = max(A.x, B.x) + rPad;
+    float miny = min(A.y, B.y) - rPad;
+    float maxy = max(A.y, B.y) + rPad;
+    return (P.x < minx || P.x > maxx || P.y < miny || P.y > maxy);
+}
 
 // -----------------------------------------------------------------------------
-// renderBranch
-//
-// Renders ONE black branch with a sharp tip, composed of two tapered segments.
-// Call this multiple times to assemble a tree (no loops inside this function).
-//
-// Parameters:
-//   col        : inout scene color
-//   centered   : your world/screen coords (same space you’ve been using)
-//   basePos    : (x, y) location of the branch BASE (the blunt end)
-//   angle      : direction the branch initially points, in radians.
-//                (0..±90° works great; use radians(…)).
-//   height     : total branch length
-//   width      : base thickness (at basePos). Tip auto-tapers to a point.
-//   bendAngle  : the extra rotation to apply AFTER the vertex (radians).
-//                Positive bends counter‑clockwise, negative bends clockwise.
-//   bendT      : where the bend/vertex sits along the length, 0..1
-//                (0.5 = middle, 0.3 = closer to base, 0.8 = near the tip).
-//   ink        : branch color (near‑black), e.g., vec3(0.03)
-//   pxAA       : pixel AA radius (pass your existing pxAA)
+// renderBranch (two tapered segments with rounded inner/outer corner)
 // -----------------------------------------------------------------------------
 void renderBranch(
     inout vec3 col,
@@ -109,38 +107,43 @@ void renderBranch(
     float len2 = max(height * (1.0-tV),  1e-3);
 
     float rBase = max(width * 0.5, 1e-4);
-    float rVert = mix(rBase, 0.001, tV);   // radius at the joint (don’t shrink by angle)
+    float rVert = mix(rBase, 0.001, tV);
     float rTip  = 0.001;
+    float rPad  = max(max(rBase, rVert), rTip) + pxAA * 2.0;
 
     // endpoints
     vec2 A    = basePos;
     vec2 dir1 = rot2(angle) * vec2(0.0, 1.0);
     vec2 V    = A + dir1 * len1;
-
     vec2 dir2 = rot2(angle + bendAngle) * vec2(0.0, 1.0);
     vec2 T    = V + dir2 * len2;
+
+    // quick bbox reject (saves lots of SDF when far away)
+    if (outsideBBoxTri(centered, A, V, T, rPad)) return;
 
     // tapered segments
     float d1 = sdTaperedCapsule(centered, A, V, rBase, rVert);
     float d2 = sdTaperedCapsule(centered, V, T, rVert, rTip);
 
-    // --- OUTER corner: tiny smooth-union to avoid a sharp V (but no bulge)
-    float dHard   = min(d1, d2);                  // reference union (no growth)
+    // outer corner smoothing (clamped so no bulge)
+    float dHard   = min(d1, d2);
     float theta   = clamp(abs(bendAngle), 0.0, 3.14159265);
-    float kOuter  = rVert * 0.30 * smoothstep(0.0, 1.0, theta / 1.5707963); // up to 90°
+    float kOuter  = rVert * 0.30 * smoothstep(0.0, 1.0, theta / 1.5707963);
     float dOuterS = (kOuter > 0.0) ? smin(d1, d2, kOuter) : dHard;
-    float dOuter  = max(dOuterS, dHard);          // clamp to forbid outward swelling
+    float dOuter  = max(dOuterS, dHard);
 
-    // --- INNER corner: union a joint disk and blend it in (this rounds the concave side)
-    float dj      = sdCircle(centered, V, rVert);                 // full joint radius
-    float kInner  = rVert * 0.25;                                 // soft blend with arms
-    float dInnerU = smin(dOuter, dj, kInner);                     // smooth union (inside only)
+    // inner corner rounding
+    float dj      = sdCircle(centered, V, rVert);
+    float kInner  = rVert * 0.25;
+    float dInnerU = smin(dOuter, dj, kInner);
 
-    // final
     float fill = aaFill(dInnerU, pxAA);
     col = mix(col, ink, fill);
 }
 
+// -----------------------------------------------------------------------------
+// renderCurvedBranch (fast Bézier tube; 1 Newton step + bbox reject)
+// -----------------------------------------------------------------------------
 void renderCurvedBranch(
     inout vec3 col,
     vec2  centered,
@@ -153,312 +156,58 @@ void renderCurvedBranch(
     vec3  ink,
     float pxAA
 ){
-    // --- layout: define base A, control C, and tip B -------------------------
     float tV   = clamp(bendT, 0.02, 0.98);
-    float len1 = max(height * tV,        1e-3);     // base→control leg length
-    float len2 = max(height * (1.0-tV),  1e-3);     // control→tip  leg length
+    float len1 = max(height * tV,        1e-3);  // base→control
+    float len2 = max(height * (1.0-tV),  1e-3);  // control→tip
 
-    // Radii: taper from base radius to a sharp tip
     float rBase = max(width * 0.5, 1e-4);
     float rCtrl = mix(rBase, 0.001, tV);
     float rTip  = 0.001;
+    float rPad  = max(max(rBase, rCtrl), rTip) + pxAA * 2.0;
 
     // Points
-    vec2 dir1 = rot2(angle) * vec2(0.0, 1.0);
     vec2 A    = basePos;
-    vec2 C    = A + dir1 * len1;                               // control (bend handle)
+    vec2 dir1 = rot2(angle) * vec2(0.0, 1.0);
+    vec2 C    = A + dir1 * len1;
     vec2 dir2 = rot2(angle + bendAngle) * vec2(0.0, 1.0);
-    vec2 B    = C + dir2 * len2;                               // tip
+    vec2 B    = C + dir2 * len2;
 
-    // One smooth, curved tube (no joint/bulge), radius blends along t
-    float d = sdQuadraticTube(centered, A, C, B, rBase, rTip);
+    // quick bbox reject for triangle A-C-B
+    if (outsideBBoxTri(centered, A, C, B, rPad)) return;
 
-    // Solid silhouette
+    float d = sdQuadraticTubeFast(centered, A, C, B, rBase, rTip);
+
     float fill = aaFill(d, pxAA);
     col = mix(col, ink, fill);
 }
 
-
-void buildTree(    inout vec3 inputColor, vec2  centered,   float pxAA) {
-      // 2) Near‑black ink for silhouettes
+// -----------------------------------------------------------------------------
+// buildTree — your original calls, unchanged
+// -----------------------------------------------------------------------------
+void buildTree(inout vec3 inputColor, vec2 centered, float pxAA) {
     vec3 INK = vec3(0.02);
-    
-    // main trunk 
-       renderBranch(
-        inputColor,                 // inout color buffer
-        centered,                   // your world coords
-        vec2(0.4, 0.48),          // basePos: left side, on ground
-        3.14159265,                 // angle: up
-        1.30,                       // height
-        0.17,                       // width
-        radians(-4.0),               // bendAngle (leans a touch right)
-        0.65,                       // bendT (bend above the middle)
-        INK,
-        pxAA
-    );
-    
-   renderCurvedBranch(
-        inputColor,                 // inout color buffer
-        centered,                   // your world coords
-        vec2(0.40, -0.30),          // basePos: left side, on ground
-        3.34159265,                 // angle: up
-        0.5,                       // height
-        0.050,                       // width
-        radians(28.0),               // bendAngle (leans a touch right)
-        0.65,                       // bendT (bend above the middle)
-        INK,
-        pxAA
-    );
-    
-      renderCurvedBranch(
-        inputColor,                 // inout color buffer
-        centered,                   // your world coords
-        vec2(0.32, -0.55),          // basePos: left side, on ground
-        4.14159265,                 // angle: up
-        0.17,                       // height
-        0.020,                       // width
-        radians(-25.0),               // bendAngle (leans a touch right)
-        0.65,                       // bendT (bend above the middle)
-        INK,
-        pxAA
-    );
-    
-       renderBranch(
-        inputColor,                 // inout color buffer
-        centered,                   // your world coords
-        vec2(0.42, -0.65),          // basePos: left side, on ground
-        3.84159265,                 // angle: up
-        0.17,                       // height
-        0.020,                       // width
-        radians(-25.0),               // bendAngle (leans a touch right)
-        0.65,                       // bendT (bend above the middle)
-        INK,
-        pxAA
-    );
-    
-       renderCurvedBranch(
-        inputColor,                 // inout color buffer
-        centered,                   // your world coords
-        vec2(0.40, -0.50),          // basePos: left side, on ground
-        2.54159265,                 // angle: up
-        0.5,                       // height
-        0.025,                       // width
-        radians(28.0),               // bendAngle (leans a touch right)
-        0.65,                       // bendT (bend above the middle)
-        INK,
-        pxAA
-    );
-    
-     renderBranch(
-        inputColor,                 // inout color buffer
-        centered,                   // your world coords
-        vec2(0.46, -0.60),          // basePos: left side, on ground
-        3.04159265,                 // angle: up
-        0.12,                       // height
-        0.013,                       // width
-        radians(-10.0),               // bendAngle (leans a touch right)
-        0.65,                       // bendT (bend above the middle)
-        INK,
-        pxAA
-    );
-    
-      renderCurvedBranch(
-        inputColor,                 // inout color buffer
-        centered,                   // your world coords
-        vec2(0.40, -0.17),          // basePos: left side, on ground
-        3.64159265,                 // angle: up
-        0.55,                       // height
-        0.050,                       // width
-        radians(15.0),               // bendAngle (leans a touch right)
-        0.65,                       // bendT (bend above the middle)
-        INK,
-        pxAA
-    );
-    
-       renderCurvedBranch(
-        inputColor,                 // inout color buffer
-        centered,                   // your world coords
-        vec2(0.367, -0.165),          // basePos: left side, on ground
-        3.24159265,                 // angle: up
-        0.17,                       // height
-        0.025,                       // width
-        radians(45.0),               // bendAngle (leans a touch right)
-        0.65,                       // bendT (bend above the middle)
-        INK,
-        pxAA
-    );
-    
-        renderCurvedBranch(
-        inputColor,                 // inout color buffer
-        centered,                   // your world coords
-        vec2(0.42, -0.30),          // basePos: left side, on ground
-        2.64159265,                 // angle: up
-        0.55,                       // height
-        0.050,                       // width
-        radians(15.0),               // bendAngle (leans a touch right)
-        0.65,                       // bendT (bend above the middle)
-        INK,
-        pxAA
-    );
-    
-           renderCurvedBranch(
-        inputColor,                 // inout color buffer
-        centered,                   // your world coords
-        vec2(0.427, -0.24),          // basePos: left side, on ground
-        3.04159265,                 // angle: up
-        0.17,                       // height
-        0.025,                       // width
-        radians(-30.0),               // bendAngle (leans a touch right)
-        0.65,                       // bendT (bend above the middle)
-        INK,
-        pxAA
-    );
-    
-      renderCurvedBranch(
-        inputColor,                 // inout color buffer
-        centered,                   // your world coords
-        vec2(0.40, 0.1),          // basePos: left side, on ground
-        3.64159265,                 // angle: up
-        0.55,                       // height
-        0.080,                       // width
-        radians(15.0),               // bendAngle (leans a touch right)
-        0.65,                       // bendT (bend above the middle)
-        INK,
-        pxAA
-    );
-    
-          renderCurvedBranch(
-        inputColor,                 // inout color buffer
-        centered,                   // your world coords
-        vec2(0.352, 0.12),          // basePos: left side, on ground
-        3.24159265,                 // angle: up
-        0.17,                       // height
-        0.035,                       // width
-        radians(45.0),               // bendAngle (leans a touch right)
-        0.65,                       // bendT (bend above the middle)
-        INK,
-        pxAA
-    );
-    
-         renderCurvedBranch(
-        inputColor,                 // inout color buffer
-        centered,                   // your world coords
-        vec2(0.25, -0.165),          // basePos: left side, on ground
-        3.74159265,                 // angle: up
-        0.37,                       // height
-        0.025,                       // width
-        radians(-35.0),               // bendAngle (leans a touch right)
-        0.65,                       // bendT (bend above the middle)
-        INK,
-        pxAA
-    );
-    
-          renderCurvedBranch(
-        inputColor,                 // inout color buffer
-        centered,                   // your world coords
-        vec2(0.28, -0.39),          // basePos: left side, on ground
-        3.14159265,                 // angle: up
-        0.17,                       // height
-        0.020,                       // width
-        radians(25.0),               // bendAngle (leans a touch right)
-        0.65,                       // bendT (bend above the middle)
-        INK,
-        pxAA
-    );
-    
-              renderCurvedBranch(
-        inputColor,                 // inout color buffer
-        centered,                   // your world coords
-        vec2(0.13, -0.39),          // basePos: left side, on ground
-        3.64159265,                 // angle: up
-        0.12,                       // height
-        0.010,                       // width
-        radians(-25.0),               // bendAngle (leans a touch right)
-        0.65,                       // bendT (bend above the middle)
-        INK,
-        pxAA
-    );
-    
-              renderBranch(
-        inputColor,                 // inout color buffer
-        centered,                   // your world coords
-        vec2(0.29, -0.12),          // basePos: left side, on ground
-        3.24159265,                 // angle: up
-        0.17,                       // height
-        0.025,                       // width
-        radians(45.0),               // bendAngle (leans a touch right)
-        0.65,                       // bendT (bend above the middle)
-        INK,
-        pxAA
-    );
-    
-renderCurvedBranch(
-        inputColor,                 // inout color buffer
-        centered,                   // your world coords
-        vec2(0.20, -0.25),          // basePos: left side, on ground
-        3.04159265,                 // angle: up
-        0.20,                       // height
-        0.025,                       // width
-        radians(45.0),               // bendAngle (leans a touch right)
-        0.65,                       // bendT (bend above the middle)
-        INK,
-        pxAA
-    );
-    
-    
-         renderCurvedBranch(
-        inputColor,                 // inout color buffer
-        centered,                   // your world coords
-        vec2(0.42, 0.0),          // basePos: left side, on ground
-        2.64159265,                 // angle: up
-        0.55,                       // height
-        0.050,                       // width
-        radians(15.0),               // bendAngle (leans a touch right)
-        0.65,                       // bendT (bend above the middle)
-        INK,
-        pxAA
-    );
-    
-         renderBranch(
-        inputColor,                 // inout color buffer
-        centered,                   // your world coords
-        vec2(0.45, 0.0),          // basePos: left side, on ground
-        3.04159265,                 // angle: up
-        0.12,                       // height
-        0.013,                       // width
-        radians(-10.0),               // bendAngle (leans a touch right)
-        0.65,                       // bendT (bend above the middle)
-        INK,
-        pxAA
-    );
-    
-    
-            renderCurvedBranch(
-        inputColor,                 // inout color buffer
-        centered,                   // your world coords
-        vec2(0.50, 0.50),          // basePos: left side, on ground
-        3.44159265,                 // angle: up
-        0.4,                       // height
-        0.050,                       // width
-        radians(-25.0),               // bendAngle (leans a touch right)
-        0.65,                       // bendT (bend above the middle)
-        INK,
-        pxAA
-    );
-    
-                renderCurvedBranch(
-        inputColor,                 // inout color buffer
-        centered,                   // your world coords
-        vec2(0.30, 0.50),          // basePos: left side, on ground
-        2.84159265,                 // angle: up
-        0.4,                       // height
-        0.050,                       // width
-        radians(25.0),               // bendAngle (leans a touch right)
-        0.65,                       // bendT (bend above the middle)
-        INK,
-        pxAA
-    );
-}
 
+    renderBranch(      inputColor, centered, vec2(0.4, 0.48), 3.14159265, 1.30, 0.17, radians(-4.0), 0.65, INK, pxAA);
+    renderCurvedBranch(inputColor, centered, vec2(0.40,-0.30), 3.34159265, 0.50, 0.050, radians(28.0), 0.65, INK, pxAA);
+    renderCurvedBranch(inputColor, centered, vec2(0.32,-0.55), 4.14159265, 0.17, 0.020, radians(-25.0),0.65, INK, pxAA);
+    renderBranch(      inputColor, centered, vec2(0.42,-0.65), 3.84159265, 0.17, 0.020, radians(-25.0),0.65, INK, pxAA);
+    renderCurvedBranch(inputColor, centered, vec2(0.40,-0.50), 2.54159265, 0.50, 0.025, radians(28.0), 0.65, INK, pxAA);
+    renderBranch(      inputColor, centered, vec2(0.46,-0.60), 3.04159265, 0.12, 0.013, radians(-10.0),0.65, INK, pxAA);
+    renderCurvedBranch(inputColor, centered, vec2(0.40,-0.17), 3.64159265, 0.55, 0.050, radians(15.0), 0.65, INK, pxAA);
+    renderCurvedBranch(inputColor, centered, vec2(0.367,-0.165),3.24159265, 0.17, 0.025, radians(45.0),  0.65, INK, pxAA);
+    renderCurvedBranch(inputColor, centered, vec2(0.42,-0.30), 2.64159265, 0.55, 0.050, radians(15.0),  0.65, INK, pxAA);
+    renderCurvedBranch(inputColor, centered, vec2(0.427,-0.24), 3.04159265, 0.17, 0.025, radians(-30.0), 0.65, INK, pxAA);
+    renderCurvedBranch(inputColor, centered, vec2(0.40, 0.10),  3.64159265, 0.55, 0.080, radians(15.0),  0.65, INK, pxAA);
+    renderCurvedBranch(inputColor, centered, vec2(0.352,0.12),  3.24159265, 0.17, 0.035, radians(45.0),  0.65, INK, pxAA);
+    renderCurvedBranch(inputColor, centered, vec2(0.25,-0.165), 3.74159265, 0.37, 0.025, radians(-35.0), 0.65, INK, pxAA);
+    renderCurvedBranch(inputColor, centered, vec2(0.28,-0.39),  3.14159265, 0.17, 0.020, radians(25.0),  0.65, INK, pxAA);
+    renderCurvedBranch(inputColor, centered, vec2(0.13,-0.39),  3.64159265, 0.12, 0.010, radians(-25.0), 0.65, INK, pxAA);
+    renderBranch(      inputColor, centered, vec2(0.29,-0.12),  3.24159265, 0.17, 0.025, radians(45.0),  0.65, INK, pxAA);
+    renderCurvedBranch(inputColor, centered, vec2(0.20,-0.25),  3.04159265, 0.20, 0.025, radians(45.0),  0.65, INK, pxAA);
+    renderCurvedBranch(inputColor, centered, vec2(0.42, 0.00),  2.64159265, 0.55, 0.050, radians(15.0),  0.65, INK, pxAA);
+    renderBranch(      inputColor, centered, vec2(0.45, 0.00),  3.04159265, 0.12, 0.013, radians(-10.0), 0.65, INK, pxAA);
+    renderCurvedBranch(inputColor, centered, vec2(0.50, 0.50),  3.44159265, 0.40, 0.050, radians(-25.0), 0.65, INK, pxAA);
+    renderCurvedBranch(inputColor, centered, vec2(0.30, 0.50),  2.84159265, 0.40, 0.050, radians(25.0),  0.65, INK, pxAA);
+}
     """.trimIndent()
 }
