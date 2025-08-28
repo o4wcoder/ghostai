@@ -11,6 +11,7 @@ object Uniforms {
         uniform float uStartState;
         uniform float uTargetState;
         uniform float uTransitionProgress;
+        uniform float uGroundEnabled;
 
         struct MouthData {
             float mask;

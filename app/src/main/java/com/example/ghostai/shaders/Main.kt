@@ -152,24 +152,20 @@ half4 main(vec2 fragCoord) {
         buildTree(moonColor, vec2(centered), float(pxAA)); // vec3 inout OK
     }
 
-    // === Ground + shadow ======================================================
-    const float GROUND_LINE = float(HLINE); // keep in sync with HLINE above
-    half footX = half(0.015) * half(sin(iTime * 0.9));
-    half2 ghostGroundCenter = half2(footX, half(GROUND_LINE) + half(0.28) * radius);
+// === Ground + shadow ======================================================
+const float GROUND_LINE = 0.48;
+half footX = half(0.015) * half(sin(iTime * 0.9));
+half2 ghostGroundCenter = half2(footX, half(GROUND_LINE) + half(0.28) * radius);
 
+vec3  withGround = moonColor;
+float groundMaskForShadow = 0.0;
+
+if (uGroundEnabled > 0.5) {
     GroundData ground = drawGround(centered, iTime, sceneLight, ghostGroundCenter);
-    vec3 withGround   = mixGroundColor(moonColor, ground, ghostMask);
+    withGround        = mixGroundColor(moonColor, ground, ghostMask);
+    groundMaskForShadow = float(ground.mask);
 
-    // --- Ground horizon darkening (band just below the horizon) --------------
-    const half GROUND_HORIZON_WIDTH    = half(0.30);
-    const half GROUND_HORIZON_STRENGTH = half(0.28);
-    half distHg     = half(abs(centered.y - HLINE));
-    half nearHg     = half(1.0) - smoothstep(half(0.0), GROUND_HORIZON_WIDTH, distHg);
-    half groundSide = step(HLINE, centered.y); // 1 below horizon, 0 above
-    half groundShade = nearHg * groundSide;
-    withGround *= (1.0 - float(GROUND_HORIZON_STRENGTH * groundShade));
-
-    // Projected oval/contact shadow (same XY; shallower Z)
+    // Projected oval/contact shadow
     vec3 sceneLightShadow = normalize(vec3(sceneLight.xy, 0.45));
     vec2 L2 = normalize(sceneLightShadow.xy);
 
@@ -185,16 +181,18 @@ half4 main(vec2 fragCoord) {
     float cy   = GROUND_LINE + offY + 0.28 * float(radius);
 
     float h = clamp(float(floatOffset / half(0.03)), -1.0, 1.0);
-    float sizeScale        = 1.0 + 0.10 * h;
-    float strengthScale    = 0.3 * mix(0.70, 0.95, 0.5 + 0.5 * h);
+    float sizeScale     = 1.0 + 0.10 * h;
+    float strengthScale = 0.3 * mix(0.70, 0.95, 0.5 + 0.5 * h);
 
     float rx = (1.05 * float(radius) * float(sx)) * sizeScale;
     float ry = (0.55 * float(radius))             * sizeScale;
 
     float oval = groundOvalShadowCentered(vec2(centered), cx, cy, rx, ry, 0.10 * float(radius));
     float shadow = clamp(oval + 0.15 * contact, 0.0, 1.0);
-    float shadowMask = shadow * float(ground.mask) * (1.0 - float(ghostMask));
+    float shadowMask = shadow * groundMaskForShadow * (1.0 - float(ghostMask));
     withGround = mix(withGround, withGround * 0.25, strengthScale * shadowMask);
+}
+
 
     // === Final composite (gate face/body work by ghostMask) ==================
     vec3 finalColor = withGround;

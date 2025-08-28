@@ -86,6 +86,7 @@ fun GhostWithMist(
         shader.setFloatUniform("uStartState", emotionTransitionState.startState.id)
         shader.setFloatUniform("uTargetState", emotionTransitionState.targetState.id)
         shader.setFloatUniform("iResolution", size.width, size.height)
+        shader.setFloatUniform("uGroundEnabled", 1.0F)
 
         drawRect(
             brush = object : ShaderBrush() {
