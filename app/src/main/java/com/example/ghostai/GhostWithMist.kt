@@ -35,6 +35,7 @@ import com.example.ghostai.ui.theme.GhostAITheme
 import com.example.ghostai.util.pointerTapEvents
 import com.example.ghostai.util.rememberShaderTransitionState
 import com.example.ghostai.util.rememberStableTime
+import timber.log.Timber
 
 @Composable
 fun GhostWithMist(
@@ -83,6 +84,7 @@ fun GhostWithMist(
             ),
 
     ) {
+         Timber.d("CGH: Quality = ${deviceSettings.quality} fps = ${deviceSettings.fps}")
         shader.setFloatUniform("iTime", time)
         shader.setFloatUniform("isSpeaking", animatedSpeaking)
         shader.setFloatUniform("uTransitionProgress", emotionTransitionState.transitionProgress)
@@ -90,6 +92,8 @@ fun GhostWithMist(
         shader.setFloatUniform("uTargetState", emotionTransitionState.targetState.id)
         shader.setFloatUniform("iResolution", size.width, size.height)
         shader.setFloatUniform("uGroundEnabled", 1.0F)
+        shader.setFloatUniform("uQuality", deviceSettings.quality)
+        shader.setFloatUniform("uFps", deviceSettings.fps)
 
         drawRect(
             brush = object : ShaderBrush() {

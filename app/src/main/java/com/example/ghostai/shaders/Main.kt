@@ -41,6 +41,12 @@ half4 main(vec2 fragCoord) {
 
     // Shared horizon line (must match ground)
     const half HLINE = half(0.48);
+    
+    // === Quality controls =====================================================
+    // uQuality: 0=low, 1=high   |  uFps: e.g., 30 on tablet, 60 on phone
+    bool  HIGH   = (uQuality > 0.5);
+    float bgStep = max(1.0 / max(uFps, 1.0), 1.0/60.0);   // never faster than 60Hz
+    float timeBG = floor(iTime / bgStep) * bgStep;        // background-only clock
 
     // === Moon =================================================================
     const half2 MOON_POS = half2(0.20, -0.78);
@@ -75,45 +81,60 @@ half4 main(vec2 fragCoord) {
     half  d        = length(ellipticalUV) - radius;
     half  ghostMask = half(1.0) - smoothstep(half(0.0), pxAA, d);
 
-    // === Mist background (cheap) =============================================
+    // === Mist background (now quality-gated & bg-timed) ======================
+    vec3  mistColor = vec3(0.0);
     const float MIST_GAIN = 0.30;
-    half2 mistUV = uv * half(3.0) + half2(iTime * 0.08, iTime * 0.03);
-    half  mistN  = fbm2_h(mistUV);
-    // approx gamma 1.2 via mix with sqrt (avoids pow)
-    half  mist   = mix(mistN, half(sqrt(max(mistN, 0.0))), half(0.4));
-    vec3  mistColor = vec3(0.85) * (float(mist) * MIST_GAIN);
 
-    // Lightning
-    {
-        half seed = half(floor(iTime * 2.0));
-        half rnd  = half(fract(sin(seed * half(91.345)) * half(47453.25)));
-        half active = step(half(0.95), rnd);
-        half ph = half(fract(iTime));
-        half fade = smoothstep(half(0.0), half(0.5), ph) * (half(1.0) - smoothstep(half(0.5), half(1.0), ph));
-        half mask = smoothstep(half(1.0), half(0.4), uv.y);
-        mistColor += (float(active * fade) * float(mask)) * vec3(0.3, 0.4, 0.5);
+    // Only compute mist above horizon
+    if (centered.y < HLINE + half(0.02)) {
+        half2 mistUV = uv * half(3.0) + half2(timeBG * 0.08, timeBG * 0.03);
+        half  mistN  = vnoise_h(mistUV); // 1 octave
+        if (HIGH) {
+            // add 2nd octave only on high
+            mistN = (mistN + half(0.5)*vnoise_h(mistUV * half(1.9))) * half(1.0/1.5);
+        }
+        // approx gamma 1.2 via mix with sqrt (avoids pow)
+        half  mist = mix(mistN, half(sqrt(max(mistN, 0.0))), half(0.4));
+        mistColor  = vec3(0.85) * (float(mist) * MIST_GAIN);
+
+        // Lightning only on HIGH
+        if (HIGH) {
+            float seed = floor(timeBG * 2.0);
+            float rnd  = fract(sin(seed * 91.345) * 47453.25);
+            float active = step(0.95, rnd);
+            float ph = fract(timeBG);
+            float fade = smoothstep(0.0, 0.5, ph) * (1.0 - smoothstep(0.5, 1.0, ph));
+            float mask = smoothstep(1.0, 0.4, uv.y);
+            mistColor += (active * fade) * mask * vec3(0.3, 0.4, 0.5);
+        }
     }
 
-    // === Clouds & moon composite (bounded but detailed) ======================
+    // === Clouds & moon composite (bounded; fewer octaves on low) =============
     half dMoon = half(length(centered - MOON_POS));
-    half needCloud = step(dMoon, HALO_R * half(3.2)); // expand to 4.0 if you see cutoffs
+    half cloudReach = HALO_R * (HIGH ? half(3.2) : half(2.5));
+    half needCloud  = step(dMoon, cloudReach);
 
     float cloudFront = 0.0;
     if (needCloud > half(0.5)) {
-        half2 cuv = uv * half(2.1) + half2(iTime * 0.02, iTime * 0.015);
+        half2 cuv = uv * half(2.1) + half2(timeBG * 0.02, timeBG * 0.015);
 
-        // 3 unrolled octaves (still cheap, local to moon)
-        half base = vnoise_h(cuv);
-        half o2   = vnoise_h(cuv * half(1.9));
-        half o3   = vnoise_h(cuv * half(3.7));
-        half cloudN = (base + half(0.5)*o2 + half(0.25)*o3) * half(1.0/1.75);
+        half base   = vnoise_h(cuv);
+        half cloudN = base;
 
-        // micro-detail only in midtones (wispy look), very low cost
-        half ridged  = abs(vnoise_h(cuv * half(5.3)) * half(2.0) - half(1.0)); // 0..1
-        half midMask = cloudN * (half(1.0) - cloudN);                          // peaks at 0.5
-        cloudN += ridged * midMask * half(0.15);
+        if (HIGH) {
+            half o2 = vnoise_h(cuv * half(1.9));
+            half o3 = vnoise_h(cuv * half(3.7));
+            cloudN  = (base + half(0.5)*o2 + half(0.25)*o3) * half(1.0/1.75);
+            // micro-detail only in midtones (wispy look)
+            half ridged  = abs(vnoise_h(cuv * half(5.3)) * half(2.0) - half(1.0)); // 0..1
+            half midMask = cloudN * (half(1.0) - cloudN);                          // peaks at 0.5
+            cloudN += ridged * midMask * half(0.15);
+        } else {
+            // cheaper 2-octave-ish look on low
+            half o2 = vnoise_h(cuv * half(1.9));
+            cloudN  = (base + half(0.5)*o2) * half(1.0/1.5);
+        }
 
-        // slightly tighter thresholds for contrast
         cloudFront = smoothstep(half(0.50), half(0.70), cloudN);
     }
 
@@ -152,47 +173,46 @@ half4 main(vec2 fragCoord) {
         buildTree(moonColor, vec2(centered), float(pxAA)); // vec3 inout OK
     }
 
-// === Ground + shadow ======================================================
-const float GROUND_LINE = 0.48;
-half footX = half(0.015) * half(sin(iTime * 0.9));
-half2 ghostGroundCenter = half2(footX, half(GROUND_LINE) + half(0.28) * radius);
+    // === Ground + shadow ======================================================
+    const float GROUND_LINE = 0.48;
+    half footX = half(0.015) * half(sin(iTime * 0.9));
+    half2 ghostGroundCenter = half2(footX, half(GROUND_LINE) + half(0.28) * radius);
 
-vec3  withGround = moonColor;
-float groundMaskForShadow = 0.0;
+    vec3  withGround = moonColor;
+    float groundMaskForShadow = 0.0;
 
-if (uGroundEnabled > 0.5) {
-    GroundData ground = drawGround(centered, iTime, sceneLight, ghostGroundCenter);
-    withGround        = mixGroundColor(moonColor, ground, ghostMask);
-    groundMaskForShadow = float(ground.mask);
+    if (uGroundEnabled > 0.5) {
+        GroundData ground = drawGround(centered, iTime, sceneLight, ghostGroundCenter);
+        withGround        = mixGroundColor(moonColor, ground, ghostMask);
+        groundMaskForShadow = float(ground.mask);
 
-    // Projected oval/contact shadow
-    vec3 sceneLightShadow = normalize(vec3(sceneLight.xy, 0.45));
-    vec2 L2 = normalize(sceneLightShadow.xy);
+        // Projected oval/contact shadow
+        vec3 sceneLightShadow = normalize(vec3(sceneLight.xy, 0.45));
+        vec2 L2 = normalize(sceneLightShadow.xy);
 
-    float contact = groundContactShadowCentered(
-        vec2(centered), float(footX), GROUND_LINE,
-        float(0.75) * float(radius) * float(sx),
-        float(0.55) * float(radius)
-    );
+        float contact = groundContactShadowCentered(
+            vec2(centered), float(footX), GROUND_LINE,
+            float(0.75) * float(radius) * float(sx),
+            float(0.55) * float(radius)
+        );
 
-    float offX = -L2.x * 0.35 * float(radius) * float(sx);
-    float offY =  max(0.0, -L2.y) * 0.28 * float(radius);
-    float cx   = float(footX) + offX;
-    float cy   = GROUND_LINE + offY + 0.28 * float(radius);
+        float offX = -L2.x * 0.35 * float(radius) * float(sx);
+        float offY =  max(0.0, -L2.y) * 0.28 * float(radius);
+        float cx   = float(footX) + offX;
+        float cy   = GROUND_LINE + offY + 0.28 * float(radius);
 
-    float h = clamp(float(floatOffset / half(0.03)), -1.0, 1.0);
-    float sizeScale     = 1.0 + 0.10 * h;
-    float strengthScale = 0.3 * mix(0.70, 0.95, 0.5 + 0.5 * h);
+        float h = clamp(float(floatOffset / half(0.03)), -1.0, 1.0);
+        float sizeScale     = 1.0 + 0.10 * h;
+        float strengthScale = 0.3 * mix(0.70, 0.95, 0.5 + 0.5 * h);
 
-    float rx = (1.05 * float(radius) * float(sx)) * sizeScale;
-    float ry = (0.55 * float(radius))             * sizeScale;
+        float rx = (1.05 * float(radius) * float(sx)) * sizeScale;
+        float ry = (0.55 * float(radius))             * sizeScale;
 
-    float oval = groundOvalShadowCentered(vec2(centered), cx, cy, rx, ry, 0.10 * float(radius));
-    float shadow = clamp(oval + 0.15 * contact, 0.0, 1.0);
-    float shadowMask = shadow * groundMaskForShadow * (1.0 - float(ghostMask));
-    withGround = mix(withGround, withGround * 0.25, strengthScale * shadowMask);
-}
-
+        float oval = groundOvalShadowCentered(vec2(centered), cx, cy, rx, ry, 0.10 * float(radius));
+        float shadow = clamp(oval + 0.15 * contact, 0.0, 1.0);
+        float shadowMask = shadow * groundMaskForShadow * (1.0 - float(ghostMask));
+        withGround = mix(withGround, withGround * 0.25, strengthScale * shadowMask);
+    }
 
     // === Final composite (gate face/body work by ghostMask) ==================
     vec3 finalColor = withGround;
@@ -233,3 +253,4 @@ if (uGroundEnabled > 0.5) {
 }
     """.trimIndent()
 }
+
