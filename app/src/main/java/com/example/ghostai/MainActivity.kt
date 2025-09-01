@@ -8,12 +8,19 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
+import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.ghostai.model.DeviceSettings
+import com.example.ghostai.model.FormFactor
 import com.example.ghostai.ui.theme.GhostAITheme
+import com.example.ghostai.ui.theme.LocalWindowClassSize
 import dagger.hilt.android.AndroidEntryPoint
 import timber.log.Timber
 
@@ -22,6 +29,7 @@ class MainActivity : ComponentActivity() {
     private val viewModel: GhostViewModel by viewModels()
     private var recognizerManager: SpeechRecognizerManager? = null
 
+    @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -51,10 +59,38 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             GhostAITheme {
-                val ghostUiState by viewModel.ghostUiState.collectAsStateWithLifecycle()
-                MainScreen(ghostUiState = ghostUiState, onGhostTouched = {
-                    viewModel.onGhostTouched()
-                })
+                val windowSizeClass = calculateWindowSizeClass(this)
+                CompositionLocalProvider(
+                    LocalWindowClassSize provides windowSizeClass,
+                ) {
+                    val device = if (windowSizeClass.widthSizeClass >= WindowWidthSizeClass.Medium) {
+                        FormFactor.Tablet
+                    } else {
+                        FormFactor.Phone
+                    }
+
+                    val quality = when (device) {
+                        FormFactor.Phone -> 2f // high
+                        FormFactor.Tablet -> 0f // low (we’ll make this drive octaves/fps later)
+                    }
+                    val targetFps = if (device == FormFactor.Tablet) 30f else 60f
+
+                    val deviceSettings = DeviceSettings(
+                        device = device,
+                        quality = quality,
+                        fps = targetFps,
+                    )
+
+                    Timber.d("CGH: Device: $device")
+                    val ghostUiState by viewModel.ghostUiState.collectAsStateWithLifecycle()
+                    MainScreen(
+                        deviceSettings = deviceSettings,
+                        ghostUiState = ghostUiState,
+                        onGhostTouched = {
+                            viewModel.onGhostTouched()
+                        },
+                    )
+                }
             }
         }
     }
@@ -88,6 +124,6 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun GreetingPreview() {
     GhostAITheme {
-        MainScreen(getGhostUiStatePreviewUiState(), onGhostTouched = {})
+        MainScreen(deviceSettings = DeviceSettings(FormFactor.Phone, 2f, 60f), getGhostUiStatePreviewUiState(), onGhostTouched = {})
     }
 }

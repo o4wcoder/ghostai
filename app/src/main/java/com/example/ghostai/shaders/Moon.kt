@@ -190,7 +190,3 @@ MoonData drawMoon(vec2 uv, vec2 moonCenter,
 }
     """.trimIndent()
 }
-
-
-
-

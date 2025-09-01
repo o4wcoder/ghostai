@@ -77,6 +77,7 @@ dependencies {
     implementation(libs.ktor.serialization.kotlinx.json)
     implementation(libs.kotlin.serialization)
     implementation(libs.exoplayer)
+    implementation(libs.androidx.compose.material3.window.size.class1)
 
     kapt(libs.hilt.compiler)
 

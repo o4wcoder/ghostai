@@ -8,16 +8,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
+import com.example.ghostai.model.DeviceSettings
+import com.example.ghostai.model.FormFactor
 import com.example.ghostai.model.GhostUiState
 import com.example.ghostai.ui.theme.GhostAITheme
 
 @Composable
 fun MainScreen(
+    deviceSettings: DeviceSettings,
     ghostUiState: GhostUiState,
     onGhostTouched: () -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         GhostWithMist(
+            deviceSettings = deviceSettings,
             ghostUiState = ghostUiState,
             onGhostThouched = onGhostTouched,
             modifier = Modifier.align(Alignment.Center),
@@ -29,6 +33,10 @@ fun MainScreen(
 @Composable
 private fun PreviewMainScreen() {
     GhostAITheme {
-        MainScreen(ghostUiState = getGhostUiStatePreviewUiState(), onGhostTouched = {})
+        MainScreen(
+            deviceSettings = DeviceSettings(FormFactor.Phone, 2f, 60f),
+            ghostUiState = getGhostUiStatePreviewUiState(),
+            onGhostTouched = {},
+        )
     }
 }

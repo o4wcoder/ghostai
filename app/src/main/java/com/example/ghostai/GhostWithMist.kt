@@ -18,7 +18,9 @@ import androidx.compose.ui.graphics.Shader
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.ghostai.model.ConversationState
+import com.example.ghostai.model.DeviceSettings
 import com.example.ghostai.model.Emotion
+import com.example.ghostai.model.FormFactor
 import com.example.ghostai.model.GhostUiState
 import com.example.ghostai.shaders.EyesDark
 import com.example.ghostai.shaders.GhostBody
@@ -36,6 +38,7 @@ import com.example.ghostai.util.rememberStableTime
 
 @Composable
 fun GhostWithMist(
+    deviceSettings: DeviceSettings,
     ghostUiState: GhostUiState,
     modifier: Modifier = Modifier,
     onGhostThouched: () -> Unit,
@@ -100,7 +103,7 @@ fun GhostWithMist(
 @Composable
 fun GhostWithMistPreview() {
     GhostAITheme {
-        GhostWithMist(ghostUiState = getGhostUiStatePreviewUiState(), time = 2.0F, modifier = Modifier.background(Color.Black), onGhostThouched = {})
+        GhostWithMist(deviceSettings = DeviceSettings(FormFactor.Phone, 2f, 60f), ghostUiState = getGhostUiStatePreviewUiState(), time = 2.0F, modifier = Modifier.background(Color.Black), onGhostThouched = {})
     }
 }
 
