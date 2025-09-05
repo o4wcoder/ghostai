@@ -4,7 +4,9 @@ import android.graphics.RuntimeShader
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -16,6 +18,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shader
 import androidx.compose.ui.graphics.ShaderBrush
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.ghostai.model.ConversationState
 import com.example.ghostai.model.DeviceSettings
@@ -27,6 +30,7 @@ import com.example.ghostai.shaders.GhostBody
 import com.example.ghostai.shaders.Ground
 import com.example.ghostai.shaders.Lighting
 import com.example.ghostai.shaders.Main
+import com.example.ghostai.shaders.MainSky
 import com.example.ghostai.shaders.Moon
 import com.example.ghostai.shaders.Mouth
 import com.example.ghostai.shaders.Tree
@@ -49,12 +53,13 @@ fun GhostWithMist(
         Uniforms.uniformDefs,
         Lighting.lighting,
         Moon.moon,
-        Tree.tree,
-        GhostBody.ghostBody,
-        EyesDark.eyes,
-        Mouth.mouth,
-        Ground.ground,
-        Main.main,
+//        Tree.tree,
+//        GhostBody.ghostBody,
+//        EyesDark.eyes,
+//        Mouth.mouth,
+//        Ground.ground,
+//        Main.main,
+        MainSky.main
     ).joinToString("\n")
 
     val shader = remember {
@@ -72,34 +77,44 @@ fun GhostWithMist(
         emotionTransitionState.transitionTo(ghostUiState.targetEmotion)
     }
 
-    Canvas(
-        modifier = modifier
-            .fillMaxSize()
-            .pointerTapEvents(
-                onTap = {
-                    onGhostThouched()
-                },
-                onDoubleTap = {
-                },
-            ),
+    Box {
+        Canvas(
+            modifier = modifier
+                .fillMaxSize()
+                .pointerTapEvents(
+                    onTap = {
+                        onGhostThouched()
+                    },
+                    onDoubleTap = {
+                    },
+                ),
 
-    ) {
-         Timber.d("CGH: Quality = ${deviceSettings.quality} fps = ${deviceSettings.fps}")
-        shader.setFloatUniform("iTime", time)
-        shader.setFloatUniform("isSpeaking", animatedSpeaking)
-        shader.setFloatUniform("uTransitionProgress", emotionTransitionState.transitionProgress)
-        shader.setFloatUniform("uStartState", emotionTransitionState.startState.id)
-        shader.setFloatUniform("uTargetState", emotionTransitionState.targetState.id)
-        shader.setFloatUniform("iResolution", size.width, size.height)
-        shader.setFloatUniform("uGroundEnabled", 1.0F)
-        shader.setFloatUniform("uQuality", deviceSettings.quality)
-        shader.setFloatUniform("uFps", deviceSettings.fps)
+            ) {
 
-        drawRect(
-            brush = object : ShaderBrush() {
-                override fun createShader(size: Size): Shader = shader
-            },
+            shader.setFloatUniform("iTime", time)
+            shader.setFloatUniform("isSpeaking", animatedSpeaking)
+            shader.setFloatUniform("uTransitionProgress", emotionTransitionState.transitionProgress)
+            shader.setFloatUniform("uStartState", emotionTransitionState.startState.id)
+            shader.setFloatUniform("uTargetState", emotionTransitionState.targetState.id)
+            shader.setFloatUniform("iResolution", size.width, size.height)
+            shader.setFloatUniform("uGroundEnabled", 1.0F)
+            shader.setFloatUniform("uQuality", deviceSettings.quality)
+            shader.setFloatUniform("uFps", deviceSettings.fps)
+
+            drawRect(
+                brush = object : ShaderBrush() {
+                    override fun createShader(size: Size): Shader = shader
+                },
+            )
+        }
+
+        Image(
+            painter = painterResource(R.drawable.tablet_normal_background),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+
         )
+
     }
 }
 

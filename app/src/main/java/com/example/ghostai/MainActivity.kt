@@ -69,11 +69,12 @@ class MainActivity : ComponentActivity() {
                         FormFactor.Phone
                     }
 
-                    val quality = when (device) {
-                        FormFactor.Phone -> 2f // high
-                        FormFactor.Tablet -> 0f // low (we’ll make this drive octaves/fps later)
-                    }
-                    val targetFps = if (device == FormFactor.Tablet) 30f else 60f
+                    // TODO: May not need this after splitting up the shaders
+                    val quality = 2f //when (device) {
+//                        FormFactor.Phone -> 2f // high
+//                        FormFactor.Tablet -> 0f // low (we’ll make this drive octaves/fps later)
+                  //  }
+                    val targetFps = 60f//if (device == FormFactor.Tablet) 30f else 60f
 
                     val deviceSettings = DeviceSettings(
                         device = device,
