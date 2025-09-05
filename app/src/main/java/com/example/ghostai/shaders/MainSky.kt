@@ -77,33 +77,36 @@ half4 main(vec2 fragCoord) {
     }
 
     // === Clouds around the moon ==============================================
-    half dMoon = half(length(centered - MOON_POS));
-    half cloudReach = HALO_R * (HIGH ? half(3.2) : half(2.5));
-    half needCloud  = step(dMoon, cloudReach);
+half dMoon = half(length(centered - MOON_POS));
+half cloudReach = HALO_R * (HIGH ? half(3.2) : half(2.5));
+half needCloud  = step(dMoon, cloudReach);
 
-    float cloudFront = 0.0;
-    if (needCloud > half(0.5)) {
-        half2 cuv = uv * half(2.1) + half2(timeBG * 0.02, timeBG * 0.015);
+float cloudFront = 0.0;
+if (needCloud > half(0.5)) {
+    vec2 cuv = vec2(uv) * 2.1 + vec2(timeBG * 0.02, timeBG * 0.015);
 
-        half base   = vnoise_h(cuv);
-        half cloudN = base;
+    // compute in float
+    float base   = float(vnoise_h(half2(cuv)));
+    float cloudN = base;
 
-        if (HIGH) {
-            half o2 = vnoise_h(cuv * half(1.9));
-            half o3 = vnoise_h(cuv * half(3.7));
-            cloudN  = (base + half(0.5)*o2 + half(0.25)*o3) * half(1.0/1.75);
-            // micro-detail only in midtones (wispy look)
-            half ridged  = abs(vnoise_h(cuv * half(5.3)) * half(2.0) - half(1.0)); // 0..1
-            half midMask = cloudN * (half(1.0) - cloudN);                          // peaks at 0.5
-            cloudN += ridged * midMask * half(0.15);
-        } else {
-            // cheaper 2-octave-ish look on low
-            half o2 = vnoise_h(cuv * half(1.9));
-            cloudN  = (base + half(0.5)*o2) * half(1.0/1.5);
-        }
-
-        cloudFront = smoothstep(half(0.50), half(0.70), cloudN);
+    if (HIGH) {
+        float o2 = float(vnoise_h(half2(cuv * 1.9)));
+        float o3 = float(vnoise_h(half2(cuv * 3.7)));
+        cloudN   = (base + 0.5*o2 + 0.25*o3) * (1.0/1.75);
+        // micro-detail only in midtones (wispy look)
+        float ridged  = abs(float(vnoise_h(half2(cuv * 5.3))) * 2.0 - 1.0);
+        float midMask = cloudN * (1.0 - cloudN);
+        cloudN += ridged * midMask * 0.15;
+    } else {
+        float o2 = float(vnoise_h(half2(cuv * 1.9)));
+        cloudN   = (base + 0.5*o2) * (1.0/1.5);
     }
+
+    // a touch wider + small boost for low-contrast screens
+    cloudFront = smoothstep(0.46, 0.72, cloudN);
+    cloudFront = pow(cloudFront, 1.1);
+}
+
 
     // === Moon/halo composite ==================================================
     const float DISC_OCCLUDE    = 0.50;

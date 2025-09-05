@@ -12,7 +12,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -27,19 +26,16 @@ import com.example.ghostai.model.FormFactor
 import com.example.ghostai.model.GhostUiState
 import com.example.ghostai.shaders.EyesDark
 import com.example.ghostai.shaders.GhostBody
-import com.example.ghostai.shaders.Ground
 import com.example.ghostai.shaders.Lighting
-import com.example.ghostai.shaders.Main
+import com.example.ghostai.shaders.MainGhost
 import com.example.ghostai.shaders.MainSky
 import com.example.ghostai.shaders.Moon
 import com.example.ghostai.shaders.Mouth
-import com.example.ghostai.shaders.Tree
 import com.example.ghostai.shaders.Uniforms
 import com.example.ghostai.ui.theme.GhostAITheme
 import com.example.ghostai.util.pointerTapEvents
 import com.example.ghostai.util.rememberShaderTransitionState
 import com.example.ghostai.util.rememberStableTime
-import timber.log.Timber
 
 @Composable
 fun GhostWithMist(
@@ -49,7 +45,7 @@ fun GhostWithMist(
     onGhostThouched: () -> Unit,
     time: Float = rememberStableTime(),
 ) {
-    val ghostShader = listOf(
+    val skyShader = listOf(
         Uniforms.uniformDefs,
         Lighting.lighting,
         Moon.moon,
@@ -62,7 +58,20 @@ fun GhostWithMist(
         MainSky.main
     ).joinToString("\n")
 
-    val shader = remember {
+    val ghostShader = listOf(
+        Uniforms.uniformDefs,
+        Lighting.lighting,
+        GhostBody.ghostBody,
+        EyesDark.eyes,
+        Mouth.mouth,
+        MainGhost.main
+    ).joinToString("\n")
+
+
+    val skyRuntimeShader = remember {
+        RuntimeShader(skyShader)
+    }
+    val ghostRuntimeShader = remember {
         RuntimeShader(ghostShader)
     }
 
@@ -81,29 +90,22 @@ fun GhostWithMist(
         Canvas(
             modifier = modifier
                 .fillMaxSize()
-                .pointerTapEvents(
-                    onTap = {
-                        onGhostThouched()
-                    },
-                    onDoubleTap = {
-                    },
-                ),
 
             ) {
 
-            shader.setFloatUniform("iTime", time)
-            shader.setFloatUniform("isSpeaking", animatedSpeaking)
-            shader.setFloatUniform("uTransitionProgress", emotionTransitionState.transitionProgress)
-            shader.setFloatUniform("uStartState", emotionTransitionState.startState.id)
-            shader.setFloatUniform("uTargetState", emotionTransitionState.targetState.id)
-            shader.setFloatUniform("iResolution", size.width, size.height)
-            shader.setFloatUniform("uGroundEnabled", 1.0F)
-            shader.setFloatUniform("uQuality", deviceSettings.quality)
-            shader.setFloatUniform("uFps", deviceSettings.fps)
+            skyRuntimeShader.setFloatUniform("iTime", time)
+            skyRuntimeShader.setFloatUniform("isSpeaking", animatedSpeaking)
+            skyRuntimeShader.setFloatUniform("uTransitionProgress", emotionTransitionState.transitionProgress)
+            skyRuntimeShader.setFloatUniform("uStartState", emotionTransitionState.startState.id)
+            skyRuntimeShader.setFloatUniform("uTargetState", emotionTransitionState.targetState.id)
+            skyRuntimeShader.setFloatUniform("iResolution", size.width, size.height)
+            skyRuntimeShader.setFloatUniform("uGroundEnabled", 1.0F)
+            skyRuntimeShader.setFloatUniform("uQuality", deviceSettings.quality)
+            skyRuntimeShader.setFloatUniform("uFps", deviceSettings.fps)
 
             drawRect(
                 brush = object : ShaderBrush() {
-                    override fun createShader(size: Size): Shader = shader
+                    override fun createShader(size: Size): Shader = skyRuntimeShader
                 },
             )
         }
@@ -114,6 +116,37 @@ fun GhostWithMist(
             modifier = Modifier.fillMaxSize(),
 
         )
+
+        Canvas(
+            modifier = modifier
+                .fillMaxSize()
+                .pointerTapEvents(
+                    onTap = {
+                        onGhostThouched()
+                    },
+                    onDoubleTap = {
+                    },
+                ),
+
+            ) {
+
+            ghostRuntimeShader.setFloatUniform("iTime", time)
+            ghostRuntimeShader.setFloatUniform("isSpeaking", animatedSpeaking)
+            ghostRuntimeShader.setFloatUniform("uTransitionProgress", emotionTransitionState.transitionProgress)
+            ghostRuntimeShader.setFloatUniform("uStartState", emotionTransitionState.startState.id)
+            ghostRuntimeShader.setFloatUniform("uTargetState", emotionTransitionState.targetState.id)
+            ghostRuntimeShader.setFloatUniform("iResolution", size.width, size.height)
+            ghostRuntimeShader.setFloatUniform("uGroundEnabled", 1.0F)
+            ghostRuntimeShader.setFloatUniform("uQuality", deviceSettings.quality)
+            ghostRuntimeShader.setFloatUniform("uFps", deviceSettings.fps)
+
+            drawRect(
+                brush = object : ShaderBrush() {
+                    override fun createShader(size: Size): Shader = ghostRuntimeShader
+                },
+            )
+        }
+
 
     }
 }
