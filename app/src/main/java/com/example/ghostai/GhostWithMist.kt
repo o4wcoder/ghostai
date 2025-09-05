@@ -55,7 +55,7 @@ fun GhostWithMist(
 //        Mouth.mouth,
 //        Ground.ground,
 //        Main.main,
-        MainSky.main
+        MainSky.main,
     ).joinToString("\n")
 
     val ghostShader = listOf(
@@ -64,9 +64,8 @@ fun GhostWithMist(
         GhostBody.ghostBody,
         EyesDark.eyes,
         Mouth.mouth,
-        MainGhost.main
+        MainGhost.main,
     ).joinToString("\n")
-
 
     val skyRuntimeShader = remember {
         RuntimeShader(skyShader)
@@ -89,10 +88,9 @@ fun GhostWithMist(
     Box {
         Canvas(
             modifier = modifier
-                .fillMaxSize()
+                .fillMaxSize(),
 
-            ) {
-
+        ) {
             skyRuntimeShader.setFloatUniform("iTime", time)
             skyRuntimeShader.setFloatUniform("isSpeaking", animatedSpeaking)
             skyRuntimeShader.setFloatUniform("uTransitionProgress", emotionTransitionState.transitionProgress)
@@ -128,8 +126,7 @@ fun GhostWithMist(
                     },
                 ),
 
-            ) {
-
+        ) {
             ghostRuntimeShader.setFloatUniform("iTime", time)
             ghostRuntimeShader.setFloatUniform("isSpeaking", animatedSpeaking)
             ghostRuntimeShader.setFloatUniform("uTransitionProgress", emotionTransitionState.transitionProgress)
@@ -146,8 +143,6 @@ fun GhostWithMist(
                 },
             )
         }
-
-
     }
 }
 

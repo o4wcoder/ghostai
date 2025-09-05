@@ -31,6 +31,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
@@ -48,6 +49,7 @@ private const val ELEVEN_LABS_API_BASE = "https://api.elevenlabs.io/v1"
 
 private const val CHAROLETTE_VOICE_ID = "XB0fDUnXU5powFXDhCwa"
 private const val DEMON_MONSTER_VOICE_ID = "vfaqCOvlrKi4Zp7C2IAm"
+private const val MODEL_ID = "eleven_flash_v2_5"
 
 @OptIn(UnstableApi::class)
 class ElevenLabsService(
@@ -128,7 +130,7 @@ class ElevenLabsService(
         }
     }
 
-    fun startStreamingSpeech(
+    suspend fun startStreamingSpeech(
         text: String,
         voiceId: String = CHAROLETTE_VOICE_ID,
         onError: (Exception) -> Unit = {},
@@ -145,91 +147,103 @@ class ElevenLabsService(
             .addHeader("xi-api-key", apiKey)
             .build()
 
-        webSocket = okHttpClient.newWebSocket(
-            request,
-            object : WebSocketListener() {
-                override fun onOpen(webSocket: WebSocket, response: Response) {
-                    Timber.d("WebSocket opened for streaming")
+        withContext(Dispatchers.IO) {
+            webSocket = okHttpClient.newWebSocket(
+                request,
+                object : WebSocketListener() {
+                    override fun onOpen(webSocket: WebSocket, response: Response) {
+                        Timber.d("WebSocket opened for streaming")
 
-                    val msg = """
+                        val msg = """
                 {
                     "text": ${text.quoteJson()},
-                    "model_id": "eleven_monolingual_v1",
+                    "model_id": "$MODEL_ID",
                     "voice_settings": {
                         "stability": 0.5,
                         "similarity_boost": 0.8
                     }
                 }
-                    """.trimIndent()
+                        """.trimIndent()
 
-                    webSocket.send(msg)
+                        webSocket.send(msg)
 
-                    // Signal end of input (required so server knows you're done)
-                    val endMsg = """{"text": ""}"""
-                    webSocket.send(endMsg)
+                        // Signal end of input (required so server knows you're done)
+                        val endMsg = """{"text": ""}"""
+                        webSocket.send(endMsg)
 
-                    // Set up ExoPlayer
-                    exoPlayer = ExoPlayer.Builder(application.applicationContext)
-                        .setRenderersFactory(GhostRenderersFactory(application.applicationContext))
-                        .build().apply {
-                            addListener(object : Player.Listener {
-                                override fun onPlaybackStateChanged(state: Int) {
-                                    when (state) {
-                                        Player.STATE_READY -> {
-                                            if (exoPlayer?.playWhenReady == true) {
-                                                onGhostSpeechStart()
+                        // Set up ExoPlayer
+                        exoPlayer = ExoPlayer.Builder(application.applicationContext)
+                            .setRenderersFactory(GhostRenderersFactory(application.applicationContext))
+                            .build().apply {
+                                addListener(object : Player.Listener {
+                                    override fun onPlaybackStateChanged(state: Int) {
+                                        when (state) {
+                                            Player.STATE_READY -> {
+                                                if (exoPlayer?.playWhenReady == true) {
+                                                    onGhostSpeechStart()
+                                                }
                                             }
+
+                                            Player.STATE_ENDED -> {
+                                                stopStreamingSpeech()
+                                                onGhostSpeechEnd()
+                                            }
+
+                                            else -> {}
                                         }
-                                        Player.STATE_ENDED -> {
-                                            stopStreamingSpeech()
-                                            onGhostSpeechEnd()
-                                        }
-                                        else -> {}
                                     }
-                                }
 
-                                override fun onPlayerError(error: PlaybackException) {
-                                    Timber.e(error, "ExoPlayer playback error")
-                                    stopStreamingSpeech()
-                                    onError(error)
-                                }
-                            })
+                                    override fun onPlayerError(error: PlaybackException) {
+                                        Timber.e(error, "ExoPlayer playback error")
+                                        stopStreamingSpeech()
+                                        onError(error)
+                                    }
+                                })
+                            }
+                    }
+
+                    override fun onMessage(webSocket: WebSocket, text: String) {
+                        Timber.d("Control message: $text")
+                        val json = JSONObject(text)
+
+                        if (json.has("audio")) {
+                            val audioBase64 = json.getString("audio")
+                            val audioBytes = Base64.decode(audioBase64, Base64.DEFAULT)
+                            buffer.write(audioBytes)
                         }
-                }
 
-                override fun onMessage(webSocket: WebSocket, text: String) {
-                    Timber.d("Control message: $text")
-                    val json = JSONObject(text)
+                        if (json.optBoolean("isFinal", false)) {
+                            Timber.d("isFinal received — finalizing playback")
+                            playBufferedMp3(
+                                application.applicationContext,
+                                buffer.toByteArray(),
+                                exoPlayer!!,
+                            )
+                        }
 
-                    if (json.has("audio")) {
-                        val audioBase64 = json.getString("audio")
-                        val audioBytes = Base64.decode(audioBase64, Base64.DEFAULT)
-                        buffer.write(audioBytes)
+                        if (json.has("error")) {
+                            stopStreamingSpeech()
+                            onError(Exception("Server error: $text"))
+                        }
                     }
 
-                    if (json.optBoolean("isFinal", false)) {
-                        Timber.d("isFinal received — finalizing playback")
-                        playBufferedMp3(application.applicationContext, buffer.toByteArray(), exoPlayer!!)
-                    }
-
-                    if (json.has("error")) {
+                    override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                        Timber.d("WebSocket closing: $code $reason")
                         stopStreamingSpeech()
-                        onError(Exception("Server error: $text"))
                     }
-                }
 
-                override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-                    Timber.d("WebSocket closing: $code $reason")
-                    stopStreamingSpeech()
-                }
-
-                override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                    Timber.e(t, "WebSocket failure")
-                    stopStreamingSpeech()
-                    onError(Exception("WebSocket failure: ${t.message}"))
-                }
-            },
-        )
+                    override fun onFailure(
+                        webSocket: WebSocket,
+                        t: Throwable,
+                        response: Response?,
+                    ) {
+                        Timber.e(t, "WebSocket failure")
+                        stopStreamingSpeech()
+                        onError(Exception("WebSocket failure: ${t.message}"))
+                    }
+                },
+            )
+        }
     }
 
     @OptIn(UnstableApi::class)

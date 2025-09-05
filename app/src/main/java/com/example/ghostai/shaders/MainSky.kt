@@ -6,18 +6,18 @@ object MainSky {
     @Language("AGSL")
     val main = """
 // --- tiny, cheap noise helpers ------------------------------------------------
-half hash12h(half2 p){
-    p = fract(p * half(0.1031));
-    p += dot(p, p.yx + half2(33.33, 33.33));
+float hash12(vec2 p){
+    p = fract(p * 0.1031);
+    p += dot(p, p.yx + vec2(33.33, 33.33));
     return fract((p.x + p.y) * p.x);
 }
-half vnoise_h(half2 p){
-    half2 i = floor(p), f = fract(p);
-    half a = hash12h(i);
-    half b = hash12h(i + half2(1,0));
-    half c = hash12h(i + half2(0,1));
-    half d = hash12h(i + half2(1,1));
-    half2 u = f*f*(half2(3.0,3.0) - half2(2.0,2.0)*f);
+float vnoise(vec2 p){
+    vec2 i = floor(p), f = fract(p);
+    float a = hash12(i);
+    float b = hash12(i + vec2(1,0));
+    float c = hash12(i + vec2(0,1));
+    float d = hash12(i + vec2(1,1));
+    vec2 u = f*f*(vec2(3.0) - 2.0*f);
     return mix(mix(a,b,u.x), mix(c,d,u.x), u.y);
 }
 
@@ -55,10 +55,10 @@ half4 main(vec2 fragCoord) {
     // Only compute mist above horizon (sky region)
     if (centered.y < HLINE + half(0.02)) {
         half2 mistUV = uv * half(3.0) + half2(timeBG * 0.08, timeBG * 0.03);
-        half  mistN  = vnoise_h(mistUV); // 1 octave
+        half  mistN  = vnoise(mistUV); // 1 octave
         if (HIGH) {
             // add 2nd octave only on high
-            mistN = (mistN + half(0.5)*vnoise_h(mistUV * half(1.9))) * half(1.0/1.5);
+            mistN = (mistN + half(0.5)*vnoise(mistUV * half(1.9))) * half(1.0/1.5);
         }
         // approx gamma 1.2 via mix with sqrt (avoids pow)
         half  mist = mix(mistN, half(sqrt(max(mistN, 0.0))), half(0.4));
@@ -83,29 +83,33 @@ half needCloud  = step(dMoon, cloudReach);
 
 float cloudFront = 0.0;
 if (needCloud > half(0.5)) {
-    vec2 cuv = vec2(uv) * 2.1 + vec2(timeBG * 0.02, timeBG * 0.015);
+    vec2 drift = vec2(
+        mod(timeBG * 0.02, 256.0),
+        mod(timeBG * 0.015, 256.0)
+    );
+    vec2 cuv = vec2(uv) * 2.1 + drift;
 
-    // compute in float
-    float base   = float(vnoise_h(half2(cuv)));
+
+    float base   = vnoise(cuv);
     float cloudN = base;
 
     if (HIGH) {
-        float o2 = float(vnoise_h(half2(cuv * 1.9)));
-        float o3 = float(vnoise_h(half2(cuv * 3.7)));
+        float o2 = vnoise(cuv * 1.9);
+        float o3 = vnoise(cuv * 3.7);
         cloudN   = (base + 0.5*o2 + 0.25*o3) * (1.0/1.75);
-        // micro-detail only in midtones (wispy look)
-        float ridged  = abs(float(vnoise_h(half2(cuv * 5.3))) * 2.0 - 1.0);
+
+        float ridged  = abs(vnoise(cuv * 5.3) * 2.0 - 1.0);
         float midMask = cloudN * (1.0 - cloudN);
         cloudN += ridged * midMask * 0.15;
     } else {
-        float o2 = float(vnoise_h(half2(cuv * 1.9)));
+        float o2 = vnoise(cuv * 1.9);
         cloudN   = (base + 0.5*o2) * (1.0/1.5);
     }
 
-    // a touch wider + small boost for low-contrast screens
     cloudFront = smoothstep(0.46, 0.72, cloudN);
     cloudFront = pow(cloudFront, 1.1);
 }
+
 
 
     // === Moon/halo composite ==================================================

@@ -14,17 +14,21 @@ half4 main(vec2 fragCoord) {
     half  pxAA     = half(1.5) * invMin;
 
     // === Floating / tail =====================================================
-    half tFloat      = half(iTime * 0.7);
-    half floatOffset = half(0.03) * half(sin(tFloat));
+    // Use full-float bounded clocks to avoid FP16 drift over time
+    const float TAU = 6.28318530718;
+
+    float tFloatF = mod(float(iTime) * 0.7, TAU * 8.0);
+    half  floatOffset = half(0.03 * sin(tFloatF));
 
     half2 ghostUV = centered;
     ghostUV.y += floatOffset;
     half2 faceUV = ghostUV;
 
-    half tTail      = half(iTime * 2.0);
-    half tailWave   = half(0.05) * half(sin(ghostUV.x * half(15.0) + tTail));
-    half tailFactor = smoothstep(half(0.0), half(0.3), ghostUV.y);
-    ghostUV.y      += tailWave * tailFactor;
+    float tTailF = mod(float(iTime) * 2.0, TAU * 8.0);
+    float waveF  = 0.05 * sin(float(ghostUV.x) * 15.0 + tTailF);
+    half  tailWave   = half(waveF);
+    half  tailFactor = smoothstep(half(0.0), half(0.3), ghostUV.y);
+    ghostUV.y += tailWave * tailFactor;
 
     // Bottom pinch
     ghostUV.x *= mix(half(1.0), half(0.30), smoothstep(half(0.0), half(0.6), ghostUV.y));
@@ -35,10 +39,11 @@ half4 main(vec2 fragCoord) {
     half  sy      = half(1.06);
     half2 shapeUV = half2(ghostUV.x / sx, ghostUV.y / sy);
 
-    // anti-aliased edge via smoothstep; this is our alpha ramp
+    // anti-aliased edge via smoothstep using pxAA
     half2 ellipticalUV = half2(shapeUV.x, shapeUV.y * half(0.90));
-    half  d         = length(ellipticalUV) - radius;
-    half  ghostMask = half(1.0) - smoothstep(half(0.0), pxAA, d);
+    float dF = length(vec2(ellipticalUV)) - float(radius);
+    half ghostMask = half(1.0 - smoothstep(0.0, float(pxAA), dF));
+
 
     // === Lighting (use your global scene light) ==============================
     vec3 sceneLight = SCENE_L_DIR;
@@ -85,7 +90,6 @@ half4 main(vec2 fragCoord) {
         finalColor = mixPupilHighlight(finalColor, pupilHighlight);
         finalColor = mixMouthColor(finalColor, mouth);
 
-        // Alpha follows silhouette (soft edge thanks to smoothstep)
         alpha = float(ghostMask);
     }
 
@@ -95,4 +99,3 @@ half4 main(vec2 fragCoord) {
 }
     """.trimIndent()
 }
-

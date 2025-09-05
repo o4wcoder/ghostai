@@ -1,5 +1,4 @@
-
-package com.example.ghostai.shaders
+package com.example.ghostai.oldui.shaders
 
 import org.intellij.lang.annotations.Language
 
@@ -253,4 +252,3 @@ half4 main(vec2 fragCoord) {
 }
     """.trimIndent()
 }
-

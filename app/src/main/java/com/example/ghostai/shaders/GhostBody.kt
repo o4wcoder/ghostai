@@ -5,6 +5,9 @@ import org.intellij.lang.annotations.Language
 object GhostBody {
     @Language("AGSL")
     val ghostBody = """
+// === constants ===============================================================
+const float TAU = 6.28318530718;
+
 // === Horizontal, overlapping tail layers ==================================
 float tailEdgeY(vec2 uv, float baseY, float amp, float freq, float phase) {
     float u = uv.x;
@@ -93,9 +96,9 @@ vec3 shadeGhostBody(vec2 uv, float radius, vec3 lightDir) {
     base  = mix(base, base * bounceCol, bounceAmt);
 
     // ==== Vertical pleats ====================================================
-    // Early-out: pleats only where they matter
     if (uv.y > 0.30 * radius) {
-        float t = iTime;
+        // bounded clock (prevents FP16 time drift artifacts)
+        float t = mod(iTime, TAU * 8.0);
         float sway = (0.10 * radius) * sin(uv.y * 8.0 + t * 1.4);
         float swayFalloff = smoothstep(0.35 * radius, 1.05 * radius, uv.y);
         float xWarp = uv.x + sway * swayFalloff;
@@ -107,7 +110,6 @@ vec3 shadeGhostBody(vec2 uv, float radius, vec3 lightDir) {
         float invW2 = 1.0 / (w*w);
         float Lx    = L.x;
 
-        // Centers & strengths
         float cx0 = -0.55 * radius, k0 = 1.00;
         float cx1 = -0.25 * radius, k1 = 0.90;
         float cx2 =  0.00 * radius, k2 = 1.10;
@@ -156,4 +158,3 @@ vec3 getGhostBodyColor(float radius, vec2 uv) {
 }
     """.trimIndent()
 }
-

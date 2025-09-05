@@ -1,4 +1,4 @@
-package com.example.ghostai.shaders
+package com.example.ghostai.oldui.shaders
 
 import org.intellij.lang.annotations.Language
 

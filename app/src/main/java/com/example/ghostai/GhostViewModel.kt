@@ -83,8 +83,8 @@ constructor(
                     updateGhostEmotion(reply.emotion)
 
                     // TODO: When add back ElevenLabs, but request on background thread
-                    // elevenLabsService.startStreamingSpeech(
-                    openAIService.playStreamingTts(
+                    elevenLabsService.startStreamingSpeech(
+                        //  openAIService.playStreamingTts(
                         text = reply.text,
                         onError = {
                             Timber.e("CGH: Streaming error: $it")
