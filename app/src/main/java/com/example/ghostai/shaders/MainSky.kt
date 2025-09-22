@@ -43,9 +43,17 @@ half4 main(vec2 fragCoord) {
     float timeBG = floor(iTime / bgStep) * bgStep;        // background-only clock
 
     // === Moon =================================================================
-    const half2 MOON_POS = half2(0.20, -0.78);
-    const half  MOON_R   = half(0.18);
-    const half  HALO_R   = half(0.40);
+    half MOON_POSITION_Y = half(-0.78 );
+    half  MOON_R   = half(0.18);
+    half  HALO_R   = half(0.40);
+     
+    if(isTablet == 1.0) {
+      MOON_POSITION_Y = half(-0.65);
+      MOON_R = half(0.12);
+      HALO_R = half(0.30);
+    }
+    half2 MOON_POS = half2(0.20, MOON_POSITION_Y);
+
     MoonData moon = drawMoon(centered, MOON_POS, MOON_R, HALO_R, half(0.35), iTime);
 
     // === Mist background (quality-gated & bg-timed) ===========================

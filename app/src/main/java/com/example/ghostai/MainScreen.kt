@@ -23,7 +23,7 @@ fun MainScreen(
         GhostWithMist(
             deviceSettings = deviceSettings,
             ghostUiState = ghostUiState,
-            onGhostThouched = onGhostTouched,
+            onGhostTouched = onGhostTouched,
             modifier = Modifier.align(Alignment.Center),
         )
     }

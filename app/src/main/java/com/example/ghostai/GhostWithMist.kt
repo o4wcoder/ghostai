@@ -42,19 +42,13 @@ fun GhostWithMist(
     deviceSettings: DeviceSettings,
     ghostUiState: GhostUiState,
     modifier: Modifier = Modifier,
-    onGhostThouched: () -> Unit,
+    onGhostTouched: () -> Unit,
     time: Float = rememberStableTime(),
 ) {
     val skyShader = listOf(
         Uniforms.uniformDefs,
         Lighting.lighting,
         Moon.moon,
-//        Tree.tree,
-//        GhostBody.ghostBody,
-//        EyesDark.eyes,
-//        Mouth.mouth,
-//        Ground.ground,
-//        Main.main,
         MainSky.main,
     ).joinToString("\n")
 
@@ -100,6 +94,7 @@ fun GhostWithMist(
             skyRuntimeShader.setFloatUniform("uGroundEnabled", 1.0F)
             skyRuntimeShader.setFloatUniform("uQuality", deviceSettings.quality)
             skyRuntimeShader.setFloatUniform("uFps", deviceSettings.fps)
+            skyRuntimeShader.setFloatUniform("isTablet", deviceSettings.isTablet)
 
             drawRect(
                 brush = object : ShaderBrush() {
@@ -120,7 +115,7 @@ fun GhostWithMist(
                 .fillMaxSize()
                 .pointerTapEvents(
                     onTap = {
-                        onGhostThouched()
+                        onGhostTouched()
                     },
                     onDoubleTap = {
                     },
@@ -136,6 +131,7 @@ fun GhostWithMist(
             ghostRuntimeShader.setFloatUniform("uGroundEnabled", 1.0F)
             ghostRuntimeShader.setFloatUniform("uQuality", deviceSettings.quality)
             ghostRuntimeShader.setFloatUniform("uFps", deviceSettings.fps)
+            ghostRuntimeShader.setFloatUniform("isTablet", deviceSettings.isTablet)
 
             drawRect(
                 brush = object : ShaderBrush() {
@@ -150,7 +146,7 @@ fun GhostWithMist(
 @Composable
 fun GhostWithMistPreview() {
     GhostAITheme {
-        GhostWithMist(deviceSettings = DeviceSettings(FormFactor.Phone, 2f, 60f), ghostUiState = getGhostUiStatePreviewUiState(), time = 2.0F, modifier = Modifier.background(Color.Black), onGhostThouched = {})
+        GhostWithMist(deviceSettings = DeviceSettings(FormFactor.Phone, 2f, 60f), ghostUiState = getGhostUiStatePreviewUiState(), time = 2.0F, modifier = Modifier.background(Color.Black), onGhostTouched = {})
     }
 }
 
