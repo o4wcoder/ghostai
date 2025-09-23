@@ -15,6 +15,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import com.example.ghostai.audioeffects.GhostRenderersFactory
 import com.example.ghostai.network.model.ElevenLabsSpeechToTextResult
+import com.example.ghostai.service.ElevenLabsVoiceIds.CHAROLETTE_VOICE_ID
 import io.ktor.client.HttpClient
 import io.ktor.client.request.accept
 import io.ktor.client.request.header
@@ -47,8 +48,11 @@ import java.io.File
 
 private const val ELEVEN_LABS_API_BASE = "https://api.elevenlabs.io/v1"
 
-private const val CHAROLETTE_VOICE_ID = "XB0fDUnXU5powFXDhCwa"
-private const val DEMON_MONSTER_VOICE_ID = "vfaqCOvlrKi4Zp7C2IAm"
+object ElevenLabsVoiceIds {
+    const val CHAROLETTE_VOICE_ID = "XB0fDUnXU5powFXDhCwa"
+    const val DEMON_MONSTER_VOICE_ID = "vfaqCOvlrKi4Zp7C2IAm"
+}
+
 private const val MODEL_ID = "eleven_flash_v2_5"
 
 @OptIn(UnstableApi::class)

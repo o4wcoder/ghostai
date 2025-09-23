@@ -24,6 +24,9 @@ import com.example.ghostai.model.DeviceSettings
 import com.example.ghostai.model.Emotion
 import com.example.ghostai.model.FormFactor
 import com.example.ghostai.model.GhostUiState
+import com.example.ghostai.service.ElevenLabsVoiceIds
+import com.example.ghostai.settings.TtsService
+import com.example.ghostai.settings.VoiceSettings
 import com.example.ghostai.shaders.EyesDark
 import com.example.ghostai.shaders.GhostBody
 import com.example.ghostai.shaders.Lighting
@@ -43,6 +46,7 @@ fun GhostWithMist(
     ghostUiState: GhostUiState,
     modifier: Modifier = Modifier,
     onGhostTouched: () -> Unit,
+    onShowVoiceSettings: () -> Unit,
     time: Float = rememberStableTime(),
 ) {
     val skyShader = listOf(
@@ -117,7 +121,8 @@ fun GhostWithMist(
                     onTap = {
                         onGhostTouched()
                     },
-                    onDoubleTap = {
+                    onLongPress = {
+                        onShowVoiceSettings()
                     },
                 ),
 
@@ -146,7 +151,7 @@ fun GhostWithMist(
 @Composable
 fun GhostWithMistPreview() {
     GhostAITheme {
-        GhostWithMist(deviceSettings = DeviceSettings(FormFactor.Phone, 2f, 60f), ghostUiState = getGhostUiStatePreviewUiState(), time = 2.0F, modifier = Modifier.background(Color.Black), onGhostTouched = {})
+        GhostWithMist(deviceSettings = DeviceSettings(FormFactor.Phone, 2f, 60f), ghostUiState = getGhostUiStatePreviewUiState(), time = 2.0F, modifier = Modifier.background(Color.Black), onGhostTouched = {}, onShowVoiceSettings = {})
     }
 }
 
@@ -166,4 +171,10 @@ fun getGhostUiStatePreviewUiState(
     conversationState = conversationState,
     startEmotion = startEmotion,
     targetEmotion = targetEmotion,
+    showSettingsDialog = false,
+    voiceSettings = VoiceSettings(
+        selectedService = TtsService.ELEVENLABS,
+        selectedVoiceId = ElevenLabsVoiceIds.CHAROLETTE_VOICE_ID,
+        voicesByService = mapOf(),
+    ),
 )

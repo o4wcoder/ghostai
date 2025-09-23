@@ -13,10 +13,16 @@ import com.example.ghostai.model.UserInput
 import com.example.ghostai.service.AssistantMessage
 import com.example.ghostai.service.ChatMessage
 import com.example.ghostai.service.ElevenLabsService
+import com.example.ghostai.service.ElevenLabsVoiceIds.CHAROLETTE_VOICE_ID
+import com.example.ghostai.service.ElevenLabsVoiceIds.DEMON_MONSTER_VOICE_ID
 import com.example.ghostai.service.GHOST_ANGRY_PROMPT
 import com.example.ghostai.service.OpenAIService
 import com.example.ghostai.service.SystemMessage
+import com.example.ghostai.service.TtsCallbacks
 import com.example.ghostai.service.UserMessage
+import com.example.ghostai.settings.TtsService
+import com.example.ghostai.settings.Voice
+import com.example.ghostai.settings.VoiceSettings
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -58,11 +64,51 @@ constructor(
                     tts.language = Locale.US
                 }
             }
-
+        loadVoiceSettings()
         observeUserInputQueue()
         observeGhostResponseQueue()
     }
 
+    val ttsCallbacks = TtsCallbacks(
+        onError = {
+            Timber.e("CGH: Streaming error: $it")
+            updateConversationState(ConversationState.Idle)
+            maybeRestartListening()
+        },
+        onStart = {
+            Timber.d("CGH: onGhostSpeechStart() @ ${System.currentTimeMillis()} - state ${_ghostUiState.value.conversationState}")
+            updateConversationState(ConversationState.GhostTalking)
+        },
+        onEnd = {
+            Timber.d("CGH: onGhostSpeechEnd() @ ${System.currentTimeMillis()} - state ${_ghostUiState.value.conversationState}")
+            updateConversationState(ConversationState.Idle)
+            maybeRestartListening()
+        },
+    )
+
+    private fun loadVoiceSettings() {
+        val voicesByService = loadVoicesByService()
+        val selectedService = TtsService.ELEVENLABS
+        val selectedVoiceId = voicesByService[selectedService]?.firstOrNull()?.id
+
+        _ghostUiState.update { it.copy(voiceSettings = VoiceSettings(selectedService, selectedVoiceId, voicesByService)) }
+    }
+
+    fun showSettingsDialog() {
+        _ghostUiState.update { it.copy(showSettingsDialog = true) }
+    }
+    fun hideSettingsDialog() {
+        _ghostUiState.update { it.copy(showSettingsDialog = false) }
+    }
+
+    fun updateVoiceSettings(voiceSettings: VoiceSettings) {
+        _ghostUiState.update {
+            it.copy(
+                showSettingsDialog = false,
+                voiceSettings = voiceSettings,
+            )
+        }
+    }
     private fun observeUserInputQueue() {
         viewModelScope.launch {
             for (input in userInputChannel) {
@@ -84,7 +130,7 @@ constructor(
 
                     // TODO: When add back ElevenLabs, but request on background thread
                     elevenLabsService.startStreamingSpeech(
-                        //  openAIService.playStreamingTts(
+                        //         openAIService.playStreamingTts(
                         text = reply.text,
                         onError = {
                             Timber.e("CGH: Streaming error: $it")
@@ -263,5 +309,22 @@ constructor(
             conversationHistory.add(AssistantMessage(content = "Earlier in the conversation: ${summary.text}"))
             conversationHistory.addAll(remaining)
         }
+    }
+
+    private fun loadVoicesByService(): Map<TtsService, List<Voice>> {
+        val elevenLabsVoices: Map<TtsService, List<Voice>> = mapOf(
+            TtsService.ELEVENLABS to listOf(
+                Voice(CHAROLETTE_VOICE_ID, "Charlotte"),
+                Voice(DEMON_MONSTER_VOICE_ID, "Demon Monster"),
+            ),
+        )
+
+        val openAiVoices: Map<TtsService, List<Voice>> = mapOf(
+            TtsService.OPENAI to listOf(
+                Voice("shimmer", "Shimmer"),
+            ),
+        )
+
+        return elevenLabsVoices + openAiVoices
     }
 }

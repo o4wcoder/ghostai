@@ -1,9 +1,15 @@
 package com.example.ghostai.model
 
+import com.example.ghostai.service.ElevenLabsVoiceIds
+import com.example.ghostai.settings.TtsService
+import com.example.ghostai.settings.VoiceSettings
+
 data class GhostUiState(
     val conversationState: ConversationState,
     val startEmotion: Emotion,
     val targetEmotion: Emotion,
+    val showSettingsDialog: Boolean = false,
+    val voiceSettings: VoiceSettings,
 ) {
     val isSpeaking: Boolean = conversationState == ConversationState.GhostTalking
 
@@ -12,6 +18,13 @@ data class GhostUiState(
             conversationState = ConversationState.Idle,
             startEmotion = Emotion.Neutral,
             targetEmotion = Emotion.Neutral,
+
+            // TODO: Put this in a better spot
+            voiceSettings = VoiceSettings(
+                selectedService = TtsService.ELEVENLABS,
+                selectedVoiceId = ElevenLabsVoiceIds.CHAROLETTE_VOICE_ID,
+                voicesByService = mapOf(),
+            ),
         )
     }
 }

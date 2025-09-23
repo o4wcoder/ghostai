@@ -90,6 +90,15 @@ class MainActivity : ComponentActivity() {
                         onGhostTouched = {
                             viewModel.onGhostTouched()
                         },
+                        onShowVoiceSettings = {
+                            viewModel.showSettingsDialog()
+                        },
+                        onHideVoiceSettings = {
+                            viewModel.hideSettingsDialog()
+                        },
+                        onUpdateVoiceSettings = {
+                            viewModel.updateVoiceSettings(it)
+                        },
                     )
                 }
             }
@@ -125,6 +134,6 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun GreetingPreview() {
     GhostAITheme {
-        MainScreen(deviceSettings = DeviceSettings(FormFactor.Phone, 2f, 60f), getGhostUiStatePreviewUiState(), onGhostTouched = {})
+        MainScreen(deviceSettings = DeviceSettings(FormFactor.Phone, 2f, 60f), getGhostUiStatePreviewUiState(), onGhostTouched = {}, onShowVoiceSettings = {}, onHideVoiceSettings = {}, onUpdateVoiceSettings = {})
     }
 }

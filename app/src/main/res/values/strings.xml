@@ -1,3 +1,10 @@
 <resources>
     <string name="app_name">Ghost AI</string>
+    <string name="voice_settings">Voice Settings</string>
+    <string name="service">Service</string>
+    <string name="eleven_labs">ElevenLabs</string>
+    <string name="openai">OpenAI</string>
+    <string name="voice">Voice</string>
+    <string name="cancel">Cancel</string>
+    <string name="save">Save</string>
 </resources>

@@ -11,6 +11,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.example.ghostai.model.DeviceSettings
 import com.example.ghostai.model.FormFactor
 import com.example.ghostai.model.GhostUiState
+import com.example.ghostai.settings.VoiceSettings
+import com.example.ghostai.settings.VoiceSettingsDialog
 import com.example.ghostai.ui.theme.GhostAITheme
 
 @Composable
@@ -18,14 +20,22 @@ fun MainScreen(
     deviceSettings: DeviceSettings,
     ghostUiState: GhostUiState,
     onGhostTouched: () -> Unit,
+    onShowVoiceSettings: () -> Unit,
+    onHideVoiceSettings: () -> Unit,
+    onUpdateVoiceSettings: (VoiceSettings) -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         GhostWithMist(
             deviceSettings = deviceSettings,
             ghostUiState = ghostUiState,
             onGhostTouched = onGhostTouched,
+            onShowVoiceSettings = onShowVoiceSettings,
             modifier = Modifier.align(Alignment.Center),
         )
+
+        VoiceSettingsDialog(isShowing = ghostUiState.showSettingsDialog, voiceSettings = ghostUiState.voiceSettings, onDismiss = {
+            onHideVoiceSettings()
+        }, onConfirm = onUpdateVoiceSettings)
     }
 }
 
@@ -37,6 +47,9 @@ private fun PreviewMainScreen() {
             deviceSettings = DeviceSettings(FormFactor.Phone, 2f, 60f),
             ghostUiState = getGhostUiStatePreviewUiState(),
             onGhostTouched = {},
+            onShowVoiceSettings = {},
+            onHideVoiceSettings = {},
+            onUpdateVoiceSettings = {},
         )
     }
 }
