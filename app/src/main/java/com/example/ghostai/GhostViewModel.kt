@@ -13,12 +13,15 @@ import com.example.ghostai.model.UserInput
 import com.example.ghostai.service.AssistantMessage
 import com.example.ghostai.service.ChatMessage
 import com.example.ghostai.service.ElevenLabsService
+import com.example.ghostai.service.ElevenLabsVoiceIds.BRITNEY_FEMALE_VILLAN
 import com.example.ghostai.service.ElevenLabsVoiceIds.CHAROLETTE_VOICE_ID
+import com.example.ghostai.service.ElevenLabsVoiceIds.COCKY_MALE_VILLAN
 import com.example.ghostai.service.ElevenLabsVoiceIds.DEMON_MONSTER_VOICE_ID
 import com.example.ghostai.service.GHOST_ANGRY_PROMPT
 import com.example.ghostai.service.OpenAIService
 import com.example.ghostai.service.SystemMessage
 import com.example.ghostai.service.TtsCallbacks
+import com.example.ghostai.service.TtsPreferenceService
 import com.example.ghostai.service.UserMessage
 import com.example.ghostai.settings.TtsService
 import com.example.ghostai.settings.Voice
@@ -30,6 +33,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -45,6 +50,7 @@ class GhostViewModel
 constructor(
     private val openAIService: OpenAIService,
     private val elevenLabsService: ElevenLabsService,
+    private val ttsPrefs: TtsPreferenceService,
     private val application: Application,
 ) : AndroidViewModel(application) {
     private val tts: TextToSpeech
@@ -87,11 +93,18 @@ constructor(
     )
 
     private fun loadVoiceSettings() {
-        val voicesByService = loadVoicesByService()
-        val selectedService = TtsService.ELEVENLABS
-        val selectedVoiceId = voicesByService[selectedService]?.firstOrNull()?.id ?: ""
+        val defaultService = TtsService.ELEVENLABS
+        val defaultVoiceId = CHAROLETTE_VOICE_ID
 
-        _ghostUiState.update { it.copy(voiceSettings = VoiceSettings(selectedService, selectedVoiceId, voicesByService)) }
+        viewModelScope.launch {
+            combine(ttsPrefs.selectedService, ttsPrefs.selectedVoiceId) { service, voiceId ->
+                val voicesByService = loadVoicesByService()
+                val selectedService = service ?: defaultService
+                val selectedVoiceId = voiceId ?: defaultVoiceId
+                _ghostUiState.update { it.copy(voiceSettings = VoiceSettings(selectedService, selectedVoiceId, voicesByService)) }
+            }
+                .collect()
+        }
     }
 
     fun showSettingsDialog() {
@@ -107,6 +120,10 @@ constructor(
                 showSettingsDialog = false,
                 voiceSettings = voiceSettings,
             )
+        }
+
+        viewModelScope.launch {
+            ttsPrefs.saveSelection(voiceSettings.selectedService, voiceSettings.selectedVoiceId)
         }
     }
     private fun observeUserInputQueue() {
@@ -128,7 +145,6 @@ constructor(
                     addGhostReply(reply)
                     updateGhostEmotion(reply.emotion)
 
-                    // TODO: When add back ElevenLabs, but request on background thread
                     when (_ghostUiState.value.voiceSettings.selectedService) {
                         TtsService.OPENAI -> {
                             openAIService.playStreamingTts(
@@ -314,6 +330,8 @@ constructor(
             TtsService.ELEVENLABS to listOf(
                 Voice(CHAROLETTE_VOICE_ID, "Charlotte"),
                 Voice(DEMON_MONSTER_VOICE_ID, "Demon Monster"),
+                Voice(COCKY_MALE_VILLAN, "Cocky Male Villain"),
+                Voice(BRITNEY_FEMALE_VILLAN, "Britney Female Villain"),
             ),
         )
 

@@ -78,6 +78,7 @@ dependencies {
     implementation(libs.kotlin.serialization)
     implementation(libs.exoplayer)
     implementation(libs.androidx.compose.material3.window.size.class1)
+    implementation(libs.datastore.preferences)
 
     kapt(libs.hilt.compiler)
 

@@ -18,8 +18,6 @@ data class GhostUiState(
             conversationState = ConversationState.Idle,
             startEmotion = Emotion.Neutral,
             targetEmotion = Emotion.Neutral,
-
-            // TODO: Put this in a better spot
             voiceSettings = VoiceSettings(
                 selectedService = TtsService.ELEVENLABS,
                 selectedVoiceId = ElevenLabsVoiceIds.CHAROLETTE_VOICE_ID,

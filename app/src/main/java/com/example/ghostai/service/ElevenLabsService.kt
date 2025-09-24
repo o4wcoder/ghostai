@@ -51,6 +51,8 @@ private const val ELEVEN_LABS_API_BASE = "https://api.elevenlabs.io/v1"
 object ElevenLabsVoiceIds {
     const val CHAROLETTE_VOICE_ID = "XB0fDUnXU5powFXDhCwa"
     const val DEMON_MONSTER_VOICE_ID = "vfaqCOvlrKi4Zp7C2IAm"
+    const val COCKY_MALE_VILLAN = "zYcjlYFOd3taleS0gkk3"
+    const val BRITNEY_FEMALE_VILLAN = "esy0r39YPLQjOczyOib8"
 }
 
 private const val MODEL_ID = "eleven_flash_v2_5"

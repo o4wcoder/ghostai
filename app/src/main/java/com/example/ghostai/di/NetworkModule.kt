@@ -5,6 +5,7 @@ import com.example.ghostai.BuildConfig
 import com.example.ghostai.network.ktorHttpClient
 import com.example.ghostai.service.ElevenLabsService
 import com.example.ghostai.service.OpenAIService
+import com.example.ghostai.service.TtsPreferenceService
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -51,5 +52,11 @@ object NetworkModule {
             okHttpClient = okHttpClient,
             application = application,
         )
+    }
+
+    @Provides
+    @Singleton
+    fun provideTtsPreferenceService(application: Application): TtsPreferenceService {
+        return TtsPreferenceService(context = application.applicationContext)
     }
 }
