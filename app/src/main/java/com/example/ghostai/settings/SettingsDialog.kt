@@ -193,7 +193,7 @@ fun TtsSettingsDialogPreview() {
         ),
     )
     var selectedService by remember { mutableStateOf(TtsService.ELEVENLABS) }
-    var selectedVoiceId by remember { mutableStateOf<String?>("1") }
+    var selectedVoiceId by remember { mutableStateOf<String>("1") }
 
     VoiceSettingsDialog(
         isShowing = true,

@@ -137,9 +137,7 @@ class ElevenLabsService(
     suspend fun startStreamingSpeech(
         text: String,
         voiceId: String = CHAROLETTE_VOICE_ID,
-        onError: (Exception) -> Unit = {},
-        onGhostSpeechEnd: () -> Unit = {},
-        onGhostSpeechStart: () -> Unit = {},
+        callbacks: TtsCallbacks,
     ) {
         stopStreamingSpeech()
 
@@ -184,13 +182,13 @@ class ElevenLabsService(
                                         when (state) {
                                             Player.STATE_READY -> {
                                                 if (exoPlayer?.playWhenReady == true) {
-                                                    onGhostSpeechStart()
+                                                    callbacks.onStart()
                                                 }
                                             }
 
                                             Player.STATE_ENDED -> {
                                                 stopStreamingSpeech()
-                                                onGhostSpeechEnd()
+                                                callbacks.onEnd()
                                             }
 
                                             else -> {}
@@ -200,7 +198,7 @@ class ElevenLabsService(
                                     override fun onPlayerError(error: PlaybackException) {
                                         Timber.e(error, "ExoPlayer playback error")
                                         stopStreamingSpeech()
-                                        onError(error)
+                                        callbacks.onError(error)
                                     }
                                 })
                             }
@@ -227,7 +225,7 @@ class ElevenLabsService(
 
                         if (json.has("error")) {
                             stopStreamingSpeech()
-                            onError(Exception("Server error: $text"))
+                            callbacks.onError(Exception("Server error: $text"))
                         }
                     }
 
@@ -243,7 +241,7 @@ class ElevenLabsService(
                     ) {
                         Timber.e(t, "WebSocket failure")
                         stopStreamingSpeech()
-                        onError(Exception("WebSocket failure: ${t.message}"))
+                        callbacks.onError(Exception("WebSocket failure: ${t.message}"))
                     }
                 },
             )

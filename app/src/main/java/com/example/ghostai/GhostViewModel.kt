@@ -89,7 +89,7 @@ constructor(
     private fun loadVoiceSettings() {
         val voicesByService = loadVoicesByService()
         val selectedService = TtsService.ELEVENLABS
-        val selectedVoiceId = voicesByService[selectedService]?.firstOrNull()?.id
+        val selectedVoiceId = voicesByService[selectedService]?.firstOrNull()?.id ?: ""
 
         _ghostUiState.update { it.copy(voiceSettings = VoiceSettings(selectedService, selectedVoiceId, voicesByService)) }
     }
@@ -129,24 +129,22 @@ constructor(
                     updateGhostEmotion(reply.emotion)
 
                     // TODO: When add back ElevenLabs, but request on background thread
-                    elevenLabsService.startStreamingSpeech(
-                        //         openAIService.playStreamingTts(
-                        text = reply.text,
-                        onError = {
-                            Timber.e("CGH: Streaming error: $it")
-                            updateConversationState(ConversationState.Idle)
-                            maybeRestartListening()
-                        },
-                        onGhostSpeechEnd = {
-                            Timber.d("CGH: onGhostSpeechEnd() @ ${System.currentTimeMillis()} - state ${_ghostUiState.value.conversationState}")
-                            updateConversationState(ConversationState.Idle)
-                            maybeRestartListening()
-                        },
-                        onGhostSpeechStart = {
-                            Timber.d("CGH: onGhostSpeechStart() @ ${System.currentTimeMillis()} - state ${_ghostUiState.value.conversationState}")
-                            updateConversationState(ConversationState.GhostTalking)
-                        },
-                    )
+                    when (_ghostUiState.value.voiceSettings.selectedService) {
+                        TtsService.OPENAI -> {
+                            openAIService.playStreamingTts(
+                                text = reply.text,
+                                callbacks = ttsCallbacks,
+                                voiceId = _ghostUiState.value.voiceSettings.selectedVoiceId,
+                            )
+                        }
+                        TtsService.ELEVENLABS -> {
+                            elevenLabsService.startStreamingSpeech(
+                                text = reply.text,
+                                callbacks = ttsCallbacks,
+                                voiceId = _ghostUiState.value.voiceSettings.selectedVoiceId,
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -321,6 +319,13 @@ constructor(
 
         val openAiVoices: Map<TtsService, List<Voice>> = mapOf(
             TtsService.OPENAI to listOf(
+                Voice("alloy", "Alloy"),
+                Voice("ash", "Ash"),
+                Voice("echo", "Echo"),
+                Voice("fable", "Fable"),
+                Voice("onyx", "Onyx"),
+                Voice("nova", "Nova"),
+                Voice("sage", "Sage"),
                 Voice("shimmer", "Shimmer"),
             ),
         )

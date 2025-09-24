@@ -22,7 +22,6 @@ import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
-import io.ktor.client.utils.EmptyContent.contentType
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
@@ -96,11 +95,9 @@ class OpenAIService(
     @OptIn(UnstableApi::class)
     suspend fun playStreamingTts(
         text: String,
-        voice: String = "shimmer",
+        voiceId: String = "shimmer",
         onComplete: () -> Unit = {},
-        onError: (Exception) -> Unit = {},
-        onGhostSpeechEnd: () -> Unit = {},
-        onGhostSpeechStart: () -> Unit = {},
+        callbacks: TtsCallbacks,
     ) {
         val tempFile = File.createTempFile("openai_tts", ".mp3", application.cacheDir).apply {
             deleteOnExit()
@@ -119,7 +116,7 @@ class OpenAIService(
                     setBody(
                         buildJsonObject {
                             put("model", "tts-1")
-                            put("voice", voice)
+                            put("voice", voiceId)
                             put("input", text)
                             put("stream", true)
                             put("format", "mp3")
@@ -162,13 +159,13 @@ class OpenAIService(
                                 when (state) {
                                     Player.STATE_READY -> {
                                         if (playWhenReady) {
-                                            onGhostSpeechStart()
+                                            callbacks.onStart()
                                         }
                                     }
                                     Player.STATE_ENDED -> {
                                         release()
                                         tempFile.delete()
-                                        onGhostSpeechEnd()
+                                        callbacks.onEnd()
                                         onComplete()
                                     }
                                     else -> {}
@@ -176,7 +173,7 @@ class OpenAIService(
                             }
 
                             override fun onPlayerError(error: PlaybackException) {
-                                onError(error)
+                                callbacks.onError(error)
                                 release()
                             }
                         })
@@ -185,7 +182,7 @@ class OpenAIService(
         } catch (e: Exception) {
             Timber.e(e, "OpenAI TTS streaming failed")
             withContext(Dispatchers.Main) {
-                onError(e)
+                callbacks.onError(e)
             }
         }
     }
