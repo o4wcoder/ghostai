@@ -28,6 +28,7 @@ import com.example.ghostai.settings.Voice
 import com.example.ghostai.settings.VoiceSettings
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,7 +43,8 @@ import timber.log.Timber
 import java.util.Locale
 import javax.inject.Inject
 
-const val MAX_NUM_MESSAGES = 30
+private const val MAX_NUM_MESSAGES = 30
+private const val USER_TALKING_TIMEOUT_MS = 7000L
 
 @HiltViewModel
 class GhostViewModel
@@ -56,6 +58,8 @@ constructor(
     private val tts: TextToSpeech
     private var speechRecognizerManager: SpeechRecognizerManager? = null
     private var isRecoveringRecognizer = false
+    private var userTalkingTimeoutJob: Job? = null
+
     private val userInputChannel = Channel<UserInput>(Channel.UNLIMITED)
     private val ghostResponseChannel = Channel<GhostReply>(Channel.UNLIMITED)
     private val _ghostUiState = MutableStateFlow(GhostUiState.default())
@@ -176,6 +180,12 @@ constructor(
         if (_ghostUiState.value.conversationState == ConversationState.Idle) {
             updateConversationState(ConversationState.UserTalking)
         }
+
+        /**
+         *   Start a timer to timeout in USER_TALKING_TIMEOUT_MS seconds if the speech recognizer gets stuck and we
+         *   don't get a success or failure from it. Then restart it.
+         */
+        startUserTalkingWatchdogTimeout()
     }
 
     fun onUserSpeechEnd(result: String?) {
@@ -242,6 +252,20 @@ constructor(
 
             else -> {
                 restartRecognizerWithDelay()
+            }
+        }
+    }
+
+    private fun startUserTalkingWatchdogTimeout() {
+        userTalkingTimeoutJob?.cancel()
+        userTalkingTimeoutJob = viewModelScope.launch {
+            delay(USER_TALKING_TIMEOUT_MS)
+            if (ghostUiState.value.conversationState == ConversationState.UserTalking) {
+                Timber.w("UserTalking timed out → forcing Idle + restart")
+                updateConversationState(ConversationState.Idle)
+                stopListening()
+                delay(200)
+                maybeRestartListening()
             }
         }
     }
