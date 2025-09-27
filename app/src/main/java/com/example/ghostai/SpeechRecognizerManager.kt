@@ -16,14 +16,22 @@ class SpeechRecognizerManager(
     private val onError: (Int, String) -> Unit,
 ) {
     private val recognizer = SpeechRecognizer.createSpeechRecognizer(context)
-    private val intent =
-        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(
-                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM,
-            )
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
-        }
+//    private val intent =
+//        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+//            putExtra(
+//                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+//                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM,
+//            )
+//            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+//        }
+private val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+    putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+    putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+    putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1500L)
+    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1000L)
+}
 
     init {
         recognizer.setRecognitionListener(
