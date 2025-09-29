@@ -67,9 +67,14 @@ class SpeechRecognizerManager(
                             ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                             ?.firstOrNull()
 
-                    if (!resultText.isNullOrBlank()) {
-                        onResult(resultText)
+                    if (resultText.isNullOrBlank()) {
+                        Timber.d("SR: empty final → NO_MATCH (auto-restart)")
+                        onError(SpeechRecognizer.ERROR_NO_MATCH, "Empty recognition result")
+                        return
                     }
+
+                    onResult(resultText)
+
                 }
 
                 override fun onPartialResults(partialResults: Bundle?) {}
