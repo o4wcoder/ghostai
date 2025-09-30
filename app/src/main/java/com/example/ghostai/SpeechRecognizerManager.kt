@@ -26,10 +26,15 @@ class SpeechRecognizerManager(
         putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1000L)
     }
 
+    private var isListening = false
+    private var isStarting = false
+
     init {
         recognizer.setRecognitionListener(
             object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) {
+                    isListening = true
+                    isStarting = false
                 }
 
                 override fun onBeginningOfSpeech() {
@@ -43,6 +48,8 @@ class SpeechRecognizerManager(
                 override fun onEndOfSpeech() {}
 
                 override fun onError(error: Int) {
+                    isListening = false
+                    isStarting = false
                     val message =
                         when (error) {
                             SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout"
@@ -62,6 +69,8 @@ class SpeechRecognizerManager(
                 }
 
                 override fun onResults(results: Bundle?) {
+                    isListening = false
+                    isStarting = false
                     val resultText =
                         results
                             ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
@@ -74,7 +83,6 @@ class SpeechRecognizerManager(
                     }
 
                     onResult(resultText)
-
                 }
 
                 override fun onPartialResults(partialResults: Bundle?) {}
@@ -89,13 +97,18 @@ class SpeechRecognizerManager(
     }
 
     fun startListening() {
+        if (isListening || isStarting) {
+            Timber.d("CGH: SpeechRecognizerManager.startListening() already listening/starting")
+            return
+        }
+        isStarting = true
         Timber.d("CGH: SpeechRecognizerManager.startListening()")
         recognizer.startListening(intent)
     }
 
     fun stopListening() {
         Timber.d("CGH: SpeechRecognizerManager.stopListening()")
-        recognizer.stopListening()
+        recognizer.cancel()
     }
 
     fun destroy() {
