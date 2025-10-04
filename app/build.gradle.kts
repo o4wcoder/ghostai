@@ -20,11 +20,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.ghostai"
+    namespace = "com.fourthwardai.ghostai"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.ghostai"
+        applicationId = "com.fourthwardai.ghostai"
         minSdk = 33
         targetSdk = 36
         versionCode = 1
