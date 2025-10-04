@@ -22,9 +22,14 @@ fun MainScreen(
     onGhostTouched: () -> Unit,
     onShowVoiceSettings: () -> Unit,
     onHideVoiceSettings: () -> Unit,
+    onDismissMissingOpenAIKeyDialog: () -> Unit,
     onUpdateVoiceSettings: (VoiceSettings) -> Unit,
 ) {
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black),
+    ) {
         GhostWithMist(
             deviceSettings = deviceSettings,
             ghostUiState = ghostUiState,
@@ -36,6 +41,10 @@ fun MainScreen(
         VoiceSettingsDialog(isShowing = ghostUiState.showSettingsDialog, voiceSettings = ghostUiState.voiceSettings, onDismiss = {
             onHideVoiceSettings()
         }, onConfirm = onUpdateVoiceSettings)
+
+        if (ghostUiState.showMissingOpenAIKeyDialog) {
+            MissingOpenAiKeyDialog(onDismiss = { onDismissMissingOpenAIKeyDialog() })
+        }
     }
 }
 
@@ -49,6 +58,7 @@ private fun PreviewMainScreen() {
             onGhostTouched = {},
             onShowVoiceSettings = {},
             onHideVoiceSettings = {},
+            onDismissMissingOpenAIKeyDialog = {},
             onUpdateVoiceSettings = {},
         )
     }

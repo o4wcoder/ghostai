@@ -1,6 +1,8 @@
 package com.example.ghostai.ui.theme
 
 import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.os.Build
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -45,25 +47,32 @@ val LocalWindowClassSize = staticCompositionLocalOf<WindowSizeClass> {
 @Composable
 fun GhostAITheme(
     darkTheme: Boolean = true,
-    // Dynamic color is available on Android 12+
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit,
 ) {
+    val context = LocalContext.current
+    val view = LocalView.current
+
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
     }
 
-    val view = LocalView.current
     SideEffect {
-        val window = (view.context as Activity).window
-        window.navigationBarColor = colorScheme.surface.toArgb()
-        WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+        if (!view.isInEditMode) {
+            val activity = view.context.findActivity()
+            val window = activity?.window
+            if (window != null) {
+                window.navigationBarColor = colorScheme.surface.toArgb()
+                val insets = WindowCompat.getInsetsController(window, view)
+                // Light icons when NOT dark theme
+                insets.isAppearanceLightStatusBars = !darkTheme
+                insets.isAppearanceLightNavigationBars = !darkTheme
+            }
+        }
     }
 
     MaterialTheme(
@@ -71,4 +80,11 @@ fun GhostAITheme(
         typography = Typography,
         content = content,
     )
+}
+
+// Helper: safely unwrap an Activity from any Context (works at runtime, null in Preview)
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }

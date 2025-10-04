@@ -223,7 +223,7 @@ class OpenAIService(
                 Voice("sage", "Sage"),
                 Voice("shimmer", "Shimmer"),
             ),
-        )
+        ).takeIf { isAvailable() } ?: emptyMap()
     }
 
     override fun getDefaultVoiceId(): String {

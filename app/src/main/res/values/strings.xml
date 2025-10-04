@@ -8,4 +8,7 @@
     <string name="cancel">Cancel</string>
     <string name="save">Save</string>
     <string name="no_voices_for_service">No voices available for this service yet..</string>
+
+    <string name="open_api_key_dialog_message">"To use Ghost AI, you'll need an OpenAI API key for basic functionality such as ghost conversations and standard voice."</string>
+    <string name="open_api_key_dialog_message_elevenlabs">"For enhanced, faster, and more expressive voices, you can also add an ElevenLabs API key."</string>
 </resources>

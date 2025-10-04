@@ -93,6 +93,11 @@ constructor(
     )
 
     private fun loadVoiceSettings() {
+        if (!openAIService.isAvailable()) {
+            _ghostUiState.update { it.copy(showMissingOpenAIKeyDialog = true) }
+            return
+        }
+
         val defaultService = if (elevenLabsService.isAvailable()) TtsService.ELEVENLABS else TtsService.OPENAI
         val defaultVoiceId = if (elevenLabsService.isAvailable()) elevenLabsService.getDefaultVoiceId() else openAIService.getDefaultVoiceId()
 
@@ -112,6 +117,10 @@ constructor(
     }
     fun hideSettingsDialog() {
         _ghostUiState.update { it.copy(showSettingsDialog = false) }
+    }
+
+    fun dismissMissingOpenAIKeyDialog() {
+        _ghostUiState.update { it.copy(showMissingOpenAIKeyDialog = false) }
     }
 
     fun updateVoiceSettings(voiceSettings: VoiceSettings) {

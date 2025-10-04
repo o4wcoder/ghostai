@@ -99,6 +99,9 @@ class MainActivity : ComponentActivity() {
                         onHideVoiceSettings = {
                             viewModel.hideSettingsDialog()
                         },
+                        onDismissMissingOpenAIKeyDialog = {
+                            viewModel.dismissMissingOpenAIKeyDialog()
+                        },
                         onUpdateVoiceSettings = {
                             viewModel.updateVoiceSettings(it)
                         },
@@ -137,6 +140,14 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun GreetingPreview() {
     GhostAITheme {
-        MainScreen(deviceSettings = DeviceSettings(FormFactor.Phone, 2f, 60f), getGhostUiStatePreviewUiState(), onGhostTouched = {}, onShowVoiceSettings = {}, onHideVoiceSettings = {}, onUpdateVoiceSettings = {})
+        MainScreen(
+            deviceSettings = DeviceSettings(FormFactor.Phone, 2f, 60f),
+            getGhostUiStatePreviewUiState(),
+            onGhostTouched = {},
+            onShowVoiceSettings = {},
+            onHideVoiceSettings = {},
+            onDismissMissingOpenAIKeyDialog = {},
+            onUpdateVoiceSettings = {},
+        )
     }
 }
