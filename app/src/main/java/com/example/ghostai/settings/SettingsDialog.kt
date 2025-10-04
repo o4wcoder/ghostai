@@ -95,7 +95,7 @@ fun VoiceSettingsDialog(
                 if (voicesForService.isEmpty()) {
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "No voices available for this service yet.",
+                        stringResource(R.string.no_voices_for_service),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -103,7 +103,10 @@ fun VoiceSettingsDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(currentVoiceSettings) }) {
+            TextButton(
+                onClick = { onConfirm(currentVoiceSettings) },
+                enabled = voicesForService.isNotEmpty(),
+            ) {
                 Text(
                     stringResource(R.string.save),
                 )

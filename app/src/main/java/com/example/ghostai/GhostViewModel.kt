@@ -13,10 +13,6 @@ import com.example.ghostai.model.UserInput
 import com.example.ghostai.service.AssistantMessage
 import com.example.ghostai.service.ChatMessage
 import com.example.ghostai.service.ElevenLabsService
-import com.example.ghostai.service.ElevenLabsVoiceIds.BRITNEY_FEMALE_VILLAN
-import com.example.ghostai.service.ElevenLabsVoiceIds.CHAROLETTE_VOICE_ID
-import com.example.ghostai.service.ElevenLabsVoiceIds.COCKY_MALE_VILLAN
-import com.example.ghostai.service.ElevenLabsVoiceIds.DEMON_MONSTER_VOICE_ID
 import com.example.ghostai.service.GHOST_ANGRY_PROMPT
 import com.example.ghostai.service.OpenAIService
 import com.example.ghostai.service.SystemMessage
@@ -97,8 +93,8 @@ constructor(
     )
 
     private fun loadVoiceSettings() {
-        val defaultService = TtsService.ELEVENLABS
-        val defaultVoiceId = CHAROLETTE_VOICE_ID
+        val defaultService = if (elevenLabsService.isAvailable()) TtsService.ELEVENLABS else TtsService.OPENAI
+        val defaultVoiceId = if (elevenLabsService.isAvailable()) elevenLabsService.getDefaultVoiceId() else openAIService.getDefaultVoiceId()
 
         viewModelScope.launch {
             combine(ttsPrefs.selectedService, ttsPrefs.selectedVoiceId) { service, voiceId ->
@@ -151,7 +147,7 @@ constructor(
 
                     when (_ghostUiState.value.voiceSettings.selectedService) {
                         TtsService.OPENAI -> {
-                            openAIService.playStreamingTts(
+                            openAIService.startStreamingSpeech(
                                 text = reply.text,
                                 callbacks = ttsCallbacks,
                                 voiceId = _ghostUiState.value.voiceSettings.selectedVoiceId,
@@ -350,28 +346,8 @@ constructor(
     }
 
     private fun loadVoicesByService(): Map<TtsService, List<Voice>> {
-        val elevenLabsVoices: Map<TtsService, List<Voice>> = mapOf(
-            TtsService.ELEVENLABS to listOf(
-                Voice(CHAROLETTE_VOICE_ID, "Charlotte"),
-                Voice(DEMON_MONSTER_VOICE_ID, "Demon Monster"),
-                Voice(COCKY_MALE_VILLAN, "Cocky Male Villain"),
-                Voice(BRITNEY_FEMALE_VILLAN, "Britney Female Villain"),
-            ),
-        )
-
-        val openAiVoices: Map<TtsService, List<Voice>> = mapOf(
-            TtsService.OPENAI to listOf(
-                Voice("alloy", "Alloy"),
-                Voice("ash", "Ash"),
-                Voice("echo", "Echo"),
-                Voice("fable", "Fable"),
-                Voice("onyx", "Onyx"),
-                Voice("nova", "Nova"),
-                Voice("sage", "Sage"),
-                Voice("shimmer", "Shimmer"),
-            ),
-        )
-
+        val elevenLabsVoices = elevenLabsService.getVoices()
+        val openAiVoices = openAIService.getVoices()
         return elevenLabsVoices + openAiVoices
     }
 }

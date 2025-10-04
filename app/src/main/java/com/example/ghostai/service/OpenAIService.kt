@@ -8,10 +8,13 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import com.example.ghostai.BuildConfig
 import com.example.ghostai.audioeffects.GhostRenderersFactory
 import com.example.ghostai.model.Emotion
 import com.example.ghostai.model.GhostReply
 import com.example.ghostai.network.ktorHttpClient
+import com.example.ghostai.settings.TtsService
+import com.example.ghostai.settings.Voice
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.expectSuccess
@@ -61,7 +64,7 @@ class OpenAIService(
     private val apiKey: String,
     private val client: HttpClient = ktorHttpClient(),
     private val application: Application,
-) {
+) : AIService {
 
     suspend fun getGhostReply(conversationHistory: List<ChatMessage>): GhostReply {
         val messages = listOf(
@@ -93,10 +96,9 @@ class OpenAIService(
     }
 
     @OptIn(UnstableApi::class)
-    suspend fun playStreamingTts(
+    override suspend fun startStreamingSpeech(
         text: String,
-        voiceId: String = "shimmer",
-        onComplete: () -> Unit = {},
+        voiceId: String,
         callbacks: TtsCallbacks,
     ) {
         val tempFile = File.createTempFile("openai_tts", ".mp3", application.cacheDir).apply {
@@ -166,7 +168,6 @@ class OpenAIService(
                                         release()
                                         tempFile.delete()
                                         callbacks.onEnd()
-                                        onComplete()
                                     }
                                     else -> {}
                                 }
@@ -204,5 +205,28 @@ class OpenAIService(
             // Fallback if the emotion tag is missing
             GhostReply(Emotion.Neutral, rawText.trim())
         }
+    }
+
+    override fun isAvailable(): Boolean {
+        return BuildConfig.OPENAI_API_KEY.trim().isNotEmpty()
+    }
+
+    override fun getVoices(): Map<TtsService, List<Voice>> {
+        return mapOf(
+            TtsService.OPENAI to listOf(
+                Voice("alloy", "Alloy"),
+                Voice("ash", "Ash"),
+                Voice("echo", "Echo"),
+                Voice("fable", "Fable"),
+                Voice("onyx", "Onyx"),
+                Voice("nova", "Nova"),
+                Voice("sage", "Sage"),
+                Voice("shimmer", "Shimmer"),
+            ),
+        )
+    }
+
+    override fun getDefaultVoiceId(): String {
+        return "sage"
     }
 }

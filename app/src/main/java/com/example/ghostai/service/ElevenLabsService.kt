@@ -13,9 +13,15 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import com.example.ghostai.BuildConfig
 import com.example.ghostai.audioeffects.GhostRenderersFactory
 import com.example.ghostai.network.model.ElevenLabsSpeechToTextResult
+import com.example.ghostai.service.ElevenLabsVoiceIds.BRITNEY_FEMALE_VILLAN
 import com.example.ghostai.service.ElevenLabsVoiceIds.CHAROLETTE_VOICE_ID
+import com.example.ghostai.service.ElevenLabsVoiceIds.COCKY_MALE_VILLAN
+import com.example.ghostai.service.ElevenLabsVoiceIds.DEMON_MONSTER_VOICE_ID
+import com.example.ghostai.settings.TtsService
+import com.example.ghostai.settings.Voice
 import io.ktor.client.HttpClient
 import io.ktor.client.request.accept
 import io.ktor.client.request.header
@@ -63,7 +69,7 @@ class ElevenLabsService(
     private val client: HttpClient,
     private val okHttpClient: OkHttpClient,
     private val application: Application,
-) {
+) : AIService {
     private var mediaPlayer: MediaPlayer? = null
     private var webSocket: WebSocket? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -136,9 +142,9 @@ class ElevenLabsService(
         }
     }
 
-    suspend fun startStreamingSpeech(
+    override suspend fun startStreamingSpeech(
         text: String,
-        voiceId: String = CHAROLETTE_VOICE_ID,
+        voiceId: String,
         callbacks: TtsCallbacks,
     ) {
         stopStreamingSpeech()
@@ -276,4 +282,23 @@ class ElevenLabsService(
     // Helper to safely quote JSON strings
     private fun String.quoteJson(): String =
         "\"" + this.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+
+    override fun isAvailable(): Boolean {
+        return BuildConfig.ELEVEN_LABS_API_KEY.trim().isNotEmpty()
+    }
+
+    override fun getVoices(): Map<TtsService, List<Voice>> {
+        return mapOf(
+            TtsService.ELEVENLABS to listOf(
+                Voice(CHAROLETTE_VOICE_ID, "Charlotte"),
+                Voice(DEMON_MONSTER_VOICE_ID, "Demon Monster"),
+                Voice(COCKY_MALE_VILLAN, "Cocky Male Villain"),
+                Voice(BRITNEY_FEMALE_VILLAN, "Britney Female Villain"),
+            ),
+        ).takeIf { isAvailable() } ?: emptyMap()
+    }
+
+    override fun getDefaultVoiceId(): String {
+        return CHAROLETTE_VOICE_ID
+    }
 }

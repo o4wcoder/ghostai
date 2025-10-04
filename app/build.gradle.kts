@@ -32,8 +32,8 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "OPENAI_API_KEY", "\"${localProperties["OPENAI_API_KEY"]}\"")
-        buildConfigField("String", "ELEVEN_LABS_API_KEY", "\"${localProperties["ELEVENLABS_API_KEY"]}\"")
+        buildConfigField("String", "OPENAI_API_KEY", "\"${localProperties["OPENAI_API_KEY"] ?: ""}\"")
+        buildConfigField("String", "ELEVEN_LABS_API_KEY", "\"${localProperties["ELEVENLABS_API_KEY"] ?: ""}\"")
     }
 
     buildTypes {
