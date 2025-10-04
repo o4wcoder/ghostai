@@ -1,19 +1,22 @@
 # 👻 Ghost AI
 
-An interactive AI-powered ghost built with **Android + Jetpack Compose + shaders**.  
-The ghost floats, speaks, listens, and reacts with spooky personality — perfect for Halloween setups or smart-home fun.
+Ghost AI is an interactive, **AI-powered character** built with **Android + Jetpack Compose + shaders**.  
+At its core, Ghost AI combines **conversational AI**, **natural voice synthesis**, and **dynamic visuals** to create a spooky but playful ghost companion.
+
+- 🧠 **Conversational AI:** The ghost uses the OpenAI API to hold natural back-and-forth conversations. Memory mechanisms allow it to stay context-aware within a session, so interactions feel more continuous and personal. Ghost reacts visually with eyes and mouth depending on the LLM emotional response.  
+- 🎙️ **AI Voice:** ElevenLabs TTS brings the ghost to life with a high-quality, expressive synthetic voice. The ghost doesn’t just talk—it *performs*.  Mutliple voice options to choose from through the settings menu (long press on the screen). There is also an option to use OpenAI TTS Voice service if you don't want to pay for ElevenLabs. OpenAI TTS is a bit slower with less expressive voices.
+- 🕯️ **Visual FX with Shaders:** The ghost’s body, mist, eyes, and glow are powered by **AGSL shaders**, animated in real-time for floating, blinking, and glowing effects that react to conversation states.  
+- 🔄 **STT ↔ AI ↔ TTS Loop:** A smooth pipeline connects speech recognition, AI responses, and voice output, so the ghost can listen, think, and talk naturally—without awkward pauses.  
+
+The result is an immersive, animated AI character that can listen, respond, and spook audiences in real time—perfect for Halloween setups, parties, or just experimenting with interactive AI characters.
 
 ---
 
 ## 📸 Screenshots
 
-_Add screenshots or screen recordings here._
-
-Example layout:
-
-| Main Ghost Screen | Conversation Flow | Settings |
-|-------------------|-------------------|----------|
-| ![Ghost Main](docs/images/screenshot_main.png) | ![Conversation](docs/images/screenshot_conversation.png) | ![Settings](docs/images/screenshot_settings.png) |
+| Main Ghost Screen | Settings |
+|-------------------|----------|
+|<img width="1080" height="2400" alt="Screenshot_20250930_185157" src="https://github.com/user-attachments/assets/f7b2901b-23f1-4282-b966-d1067d42b210" />|<img width="1080" height="2400" alt="Screenshot_20250930_185308" src="https://github.com/user-attachments/assets/0f7fca8c-ba9c-42eb-a522-1f330f6a4ad4" />|
 
 ---
 
@@ -53,35 +56,9 @@ This project uses two external services:
 ## 🛠️ Tech Stack
 
 - **Language:** Kotlin  
-- **UI:** Jetpack Compose (Material 2), AGSL Shaders  
+- **UI:** Jetpack Compose (Material 3), AGSL Shaders  
 - **Media:** ExoPlayer + ElevenLabs TTS  
-- **Networking:** Ktor with kotlinx.serialization  
-- **Testing:** mockk + Turbine  
-- **Logging:** Timber  
-
----
-
-## 📦 Project Structure
-
-```
-/app
-  /ui        # Ghost visuals, Compose screens
-  /audio     # Speech recognizer, TTS, audio playback
-  /llm       # OpenAI integration
-  /vm        # GhostViewModel + state management
-  /enhancements  # Feature roadmap & checklist
-```
-
----
-
-## 🧪 Running Locally
-
-```bash
-./gradlew assembleDebug
-adb install app/build/outputs/apk/debug/app-debug.apk
-```
-
-Target device: Pixel series (Android 13+ recommended).  
+- **Networking:** Ktor with kotlinx.serialization   
 
 ---
 
@@ -91,6 +68,3 @@ See [Enhancements Checklist](ghost_ai_enhancements_checklist.md) for upcoming fe
 
 ---
 
-## 📜 License
-
-_MIT / Apache 2.0 — your choice here._
