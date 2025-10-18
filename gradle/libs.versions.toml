@@ -1,15 +1,15 @@
 [versions]
-agp = "8.11.0"
-kotlin = "2.1.21"
+agp = "8.13.0"
+kotlin = "2.2.20"
 coreKtx = "1.16.0"
 junit = "4.13.2"
 junitVersion = "1.2.1"
 espressoCore = "3.6.1"
 lifecycleRuntimeKtx = "2.9.1"
 activityCompose = "1.10.1"
-composeBom = "2025.06.01"
-hilt = "2.56.2"
-hilt-plugin = "2.56.2"
+composeBom = "2025.10.00"
+hilt = "2.57.2"
+hilt-plugin = "2.57.2"
 timberVersion = "5.0.1"
 ktorVersion = "3.2.0"
 kotlinJson = "1.8.1"
@@ -53,4 +53,3 @@ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "ko
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt-plugin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotlessVersion" }
-
