@@ -4,6 +4,7 @@ import android.app.Application
 import com.fourthwardai.ghostai.BuildConfig
 import com.fourthwardai.ghostai.network.ktorHttpClient
 import com.fourthwardai.ghostai.service.ElevenLabsService
+import com.fourthwardai.ghostai.service.HueLightService
 import com.fourthwardai.ghostai.service.OpenAIService
 import com.fourthwardai.ghostai.service.TtsPreferenceService
 import dagger.Module
@@ -53,6 +54,16 @@ object NetworkModule {
             application = application,
         )
     }
+
+    @Provides
+    @Singleton
+    fun provideHueLightService(
+        client: HttpClient,
+    ): HueLightService = HueLightService(
+        client = client,
+        bridgeIp = BuildConfig.HUE_BRIDGE_IP,
+        username = BuildConfig.HUE_USERNAME,
+    )
 
     @Provides
     @Singleton

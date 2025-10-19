@@ -14,6 +14,7 @@ import com.fourthwardai.ghostai.service.AssistantMessage
 import com.fourthwardai.ghostai.service.ChatMessage
 import com.fourthwardai.ghostai.service.ElevenLabsService
 import com.fourthwardai.ghostai.service.GHOST_ANGRY_PROMPT
+import com.fourthwardai.ghostai.service.HueLightService
 import com.fourthwardai.ghostai.service.OpenAIService
 import com.fourthwardai.ghostai.service.SystemMessage
 import com.fourthwardai.ghostai.service.TtsCallbacks
@@ -49,6 +50,7 @@ constructor(
     private val openAIService: OpenAIService,
     private val elevenLabsService: ElevenLabsService,
     private val ttsPrefs: TtsPreferenceService,
+    private val hueLightService: HueLightService,
     private val application: Application,
 ) : AndroidViewModel(application) {
     private val tts: TextToSpeech
@@ -73,6 +75,19 @@ constructor(
         loadVoiceSettings()
         observeUserInputQueue()
         observeGhostResponseQueue()
+
+//        viewModelScope.launch(Dispatchers.IO) {
+//           val lights = hueLightService.getLights()
+//           // Timber.d("CGH: Hue lights: $lights")
+//            lights.forEach { light ->
+//                Timber.d("CGH: Light name: ${light.value.name} id: ${light.key}\n")
+//               // if(light.value.name) {)
+//
+//            }
+//
+//
+//            hueLightService.setLightState(lightId = "37", on = false)
+//        }
     }
 
     val ttsCallbacks = TtsCallbacks(
@@ -313,6 +328,41 @@ constructor(
             startEmotion = currentTarget,
             targetEmotion = newEmotion,
         )
+        if (currentTarget != newEmotion) {
+            updateLightWithEmotion(newEmotion)
+        }
+    }
+
+    private fun updateLightWithEmotion(emotion: Emotion) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                when (emotion) {
+                    // TODO: Put these int he Emotion enum
+                    Emotion.Happy -> updateLightColor(hue = 12000, sat = 200)
+                    Emotion.Sad -> updateLightColor(hue = 46920, sat = 200)
+                    Emotion.Angry -> updateLightColor(hue = 0, sat = 254)
+                    Emotion.Neutral -> updateLightColor(hue = 9000, sat = 128)
+                    Emotion.Spooky -> updateLightColor(hue = 25000, sat = 254)
+                    Emotion.Funny -> updateLightColor(56100, sat = 200)
+                }
+            } catch (e: Exception) {
+                Timber.e("CGH: Failed to update Hue light for emotion $emotion: ${e.message}")
+            }
+        }
+    }
+
+    private suspend fun updateLightColor(hue: Int, sat: Int) {
+        try {
+            hueLightService.setLightState(
+                lightId = "37",
+                on = true,
+                bri = 100,
+                hue = hue,
+                sat = sat,
+            )
+        } catch (e: Exception) {
+            Timber.e("CGH: Failed to update Hue light color: ${e.message}")
+        }
     }
 
     private fun updateConversationState(state: ConversationState) {

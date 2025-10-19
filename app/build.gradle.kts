@@ -34,6 +34,8 @@ android {
 
         buildConfigField("String", "OPENAI_API_KEY", "\"${localProperties["OPENAI_API_KEY"] ?: ""}\"")
         buildConfigField("String", "ELEVEN_LABS_API_KEY", "\"${localProperties["ELEVENLABS_API_KEY"] ?: ""}\"")
+        buildConfigField("String", "HUE_BRIDGE_IP", "\"${localProperties["HUE_BRIDGE_IP"] ?: ""}\"")
+        buildConfigField("String", "HUE_USERNAME", "\"${localProperties["HUE_USERNAME"] ?: ""}\"")
     }
 
     buildTypes {
