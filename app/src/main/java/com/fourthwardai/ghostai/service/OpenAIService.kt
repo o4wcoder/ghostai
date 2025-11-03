@@ -40,7 +40,7 @@ import java.io.File
 import java.io.FileInputStream
 import java.util.Locale
 
-private const val LLM_MODEL = "gpt-4o"
+private const val LLM_MODEL = "gpt-4.1-mini"//"gpt-4-turbo"//"gpt-4o"
 
 @Serializable
 data class ChatCompletionRequest(

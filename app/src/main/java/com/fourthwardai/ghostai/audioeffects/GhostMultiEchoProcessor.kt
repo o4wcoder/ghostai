@@ -14,8 +14,8 @@ class GhostMultiEchoProcessor : BaseAudioProcessor() {
 
     // Delay taps at 500ms, 700ms, and 900ms
     private lateinit var delayBuffers: Array<ShortArray>
-    private val delaysMs = intArrayOf(500, 700) // , 900)
-    private val decays = floatArrayOf(0.15f, 0.09f) // , 0.1f)
+    private val delaysMs = intArrayOf(300, 500) // , 900)
+    private val decays = floatArrayOf(0.10f, 0.06f) // , 0.1f)
     private lateinit var delayIndices: IntArray
 
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
