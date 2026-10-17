@@ -18,6 +18,7 @@ ksp = "2.3.12"
 exoplayerVersion = "1.11.1"
 material3WindowSizeClassVersion = "1.4.0"
 androidDataStore = "1.2.1"
+camerax = "1.6.2"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -46,6 +47,9 @@ kotlin-serialization = { group = "org.jetbrains.kotlinx", name = "kotlinx-serial
 exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "exoplayerVersion" }
 androidx-compose-material3-window-size-class1 = { group = "androidx.compose.material3", name = "material3-window-size-class", version.ref = "material3WindowSizeClassVersion" }
 datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "androidDataStore" }
+camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "camerax" }
+camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
+camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

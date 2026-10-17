@@ -77,6 +77,9 @@ dependencies {
     implementation(libs.exoplayer)
     implementation(libs.androidx.compose.material3.window.size.class1)
     implementation(libs.datastore.preferences)
+    implementation(libs.camera.core)
+    implementation(libs.camera.camera2)
+    implementation(libs.camera.lifecycle)
 
     ksp(libs.hilt.compiler)
 
