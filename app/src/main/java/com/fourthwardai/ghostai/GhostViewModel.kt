@@ -5,6 +5,8 @@ import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.fourthwardai.ghostai.camera.GhostCameraManager
+import com.fourthwardai.ghostai.camera.VisionPreferenceService
 import com.fourthwardai.ghostai.model.ConversationState
 import com.fourthwardai.ghostai.model.Emotion
 import com.fourthwardai.ghostai.model.GhostReply
@@ -26,8 +28,10 @@ import com.fourthwardai.ghostai.settings.VoiceSettings
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -50,11 +54,13 @@ constructor(
     private val openAIService: OpenAIService,
     private val elevenLabsService: ElevenLabsService,
     private val ttsPrefs: TtsPreferenceService,
+    private val visionPrefs: VisionPreferenceService,
     private val hueLightService: HueLightService,
     private val application: Application,
 ) : AndroidViewModel(application) {
     private val tts: TextToSpeech
     private var speechRecognizerManager: SpeechRecognizerManager? = null
+    private var ghostCameraManager: GhostCameraManager? = null
     private var isRecoveringRecognizer = false
     private var userTalkingTimeoutJob: Job? = null
 
@@ -73,6 +79,7 @@ constructor(
                 }
             }
         loadVoiceSettings()
+        loadVisionSetting()
         observeUserInputQueue()
         observeGhostResponseQueue()
 
@@ -127,6 +134,25 @@ constructor(
         }
     }
 
+    /** The saved vision setting. Unlike [ghostUiState], it never emits the default before the saved value has loaded. */
+    val savedVisionEnabled: Flow<Boolean> = visionPrefs.visionEnabled
+
+    private fun loadVisionSetting() {
+        viewModelScope.launch {
+            visionPrefs.visionEnabled.collect { enabled ->
+                _ghostUiState.update { it.copy(visionEnabled = enabled) }
+            }
+        }
+    }
+
+    fun updateVisionEnabled(enabled: Boolean) {
+        Timber.d("CGH: Vision enabled = $enabled")
+        _ghostUiState.update { it.copy(visionEnabled = enabled) }
+        viewModelScope.launch {
+            visionPrefs.setVisionEnabled(enabled)
+        }
+    }
+
     fun showSettingsDialog() {
         _ghostUiState.update { it.copy(showSettingsDialog = true) }
     }
@@ -153,8 +179,21 @@ constructor(
     private fun observeUserInputQueue() {
         viewModelScope.launch {
             for (input in userInputChannel) {
+                // Start the capture first so it runs while the message is queued up. Only voice turns get an image:
+                // a touch is sent as a system prompt, so there is no user message for the image to attach to.
+                val imageDeferred = async(Dispatchers.IO) {
+                    if (input is UserInput.Voice && _ghostUiState.value.visionEnabled) {
+                        Timber.d("CGH: Starting image capture @ ${System.currentTimeMillis()}")
+                        ghostCameraManager?.captureImage()
+                    } else {
+                        null
+                    }
+                }
                 addUserMessage(input)
-                val openAiResponse = openAIService.getGhostReply(conversationHistory)
+                // The user may have turned vision off while the frame was being captured/encoded; honor that
+                val imageBase64 = imageDeferred.await()?.takeIf { _ghostUiState.value.visionEnabled }
+                Timber.d("CGH: Calling getGhostReply @ ${System.currentTimeMillis()}, image = ${imageBase64 != null}")
+                val openAiResponse = openAIService.getGhostReply(conversationHistory, imageBase64)
                 ghostResponseChannel.send(openAiResponse)
             }
         }
@@ -188,6 +227,10 @@ constructor(
                 }
             }
         }
+    }
+
+    fun setCameraManager(manager: GhostCameraManager) {
+        ghostCameraManager = manager
     }
 
     fun setSpeechRecognizer(manager: SpeechRecognizerManager) {

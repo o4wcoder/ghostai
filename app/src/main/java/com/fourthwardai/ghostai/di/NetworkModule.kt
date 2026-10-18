@@ -2,6 +2,7 @@ package com.fourthwardai.ghostai.di
 
 import android.app.Application
 import com.fourthwardai.ghostai.BuildConfig
+import com.fourthwardai.ghostai.camera.VisionPreferenceService
 import com.fourthwardai.ghostai.network.ktorHttpClient
 import com.fourthwardai.ghostai.service.ElevenLabsService
 import com.fourthwardai.ghostai.service.HueLightService
@@ -69,5 +70,11 @@ object NetworkModule {
     @Singleton
     fun provideTtsPreferenceService(application: Application): TtsPreferenceService {
         return TtsPreferenceService(context = application.applicationContext)
+    }
+
+    @Provides
+    @Singleton
+    fun provideVisionPreferenceService(application: Application): VisionPreferenceService {
+        return VisionPreferenceService(context = application.applicationContext)
     }
 }

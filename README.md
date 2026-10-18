@@ -67,4 +67,3 @@ This project uses two external services:
 See [Enhancements Checklist](ghost_ai_enhancements_checklist.md) for upcoming features.  
 
 ---
-
