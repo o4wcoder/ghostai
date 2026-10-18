@@ -24,6 +24,7 @@ fun MainScreen(
     onHideVoiceSettings: () -> Unit,
     onDismissMissingOpenAIKeyDialog: () -> Unit,
     onUpdateVoiceSettings: (VoiceSettings) -> Unit,
+    onUpdateVisionEnabled: (Boolean) -> Unit,
 ) {
     Box(
         modifier = Modifier
@@ -38,9 +39,16 @@ fun MainScreen(
             modifier = Modifier.align(Alignment.Center),
         )
 
-        VoiceSettingsDialog(isShowing = ghostUiState.showSettingsDialog, voiceSettings = ghostUiState.voiceSettings, onDismiss = {
-            onHideVoiceSettings()
-        }, onConfirm = onUpdateVoiceSettings)
+        VoiceSettingsDialog(
+            isShowing = ghostUiState.showSettingsDialog,
+            voiceSettings = ghostUiState.voiceSettings,
+            visionEnabled = ghostUiState.visionEnabled,
+            onDismiss = { onHideVoiceSettings() },
+            onConfirm = { voiceSettings, visionEnabled ->
+                onUpdateVoiceSettings(voiceSettings)
+                onUpdateVisionEnabled(visionEnabled)
+            },
+        )
 
         if (ghostUiState.showMissingOpenAIKeyDialog) {
             MissingOpenAiKeyDialog(onDismiss = { onDismissMissingOpenAIKeyDialog() })
@@ -60,6 +68,7 @@ private fun PreviewMainScreen() {
             onHideVoiceSettings = {},
             onDismissMissingOpenAIKeyDialog = {},
             onUpdateVoiceSettings = {},
+            onUpdateVisionEnabled = {},
         )
     }
 }

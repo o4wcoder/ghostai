@@ -21,17 +21,49 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import com.fourthwardai.ghostai.camera.GhostCameraManager
 import com.fourthwardai.ghostai.model.DeviceSettings
 import com.fourthwardai.ghostai.model.FormFactor
 import com.fourthwardai.ghostai.ui.theme.GhostAITheme
 import com.fourthwardai.ghostai.ui.theme.LocalWindowClassSize
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 import timber.log.Timber
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private val viewModel: GhostViewModel by viewModels()
     private var recognizerManager: SpeechRecognizerManager? = null
+    private var cameraManager: GhostCameraManager? = null
+    private var isPermissionRequestInFlight = false
+
+    // Null until the saved vision setting has loaded, so we never act on the default before knowing the user's choice
+    private var visionEnabled: Boolean? = null
+
+    private val permissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { results ->
+        isPermissionRequestInFlight = false
+        results[Manifest.permission.RECORD_AUDIO]?.let { isGranted ->
+            if (isGranted) {
+                Timber.d("Microphone permission granted")
+                setupRecognizer()
+            } else {
+                Timber.w("Microphone permission denied")
+            }
+        }
+        val cameraResult = results[Manifest.permission.CAMERA]
+        when (cameraResult) {
+            true -> Timber.d("CGH: Camera permission granted")
+            false -> Timber.w("CGH: Camera permission denied, ghost will respond without sight")
+            null -> {}
+        }
+        // If this was only a mic request, a camera request may have been deferred while it was showing, so allow one now.
+        // If the camera was just answered, don't ask again (avoids re-prompting in a loop after a denial).
+        visionEnabled?.let { updateCameraBinding(it, requestPermissionIfNeeded = cameraResult == null) }
+    }
 
     @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,28 +80,17 @@ class MainActivity : ComponentActivity() {
 
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        val permission = Manifest.permission.RECORD_AUDIO
+        cameraManager = GhostCameraManager(this).also { viewModel.setCameraManager(it) }
 
-        val permissionLauncher = registerForActivityResult(
-            ActivityResultContracts.RequestPermission(),
-        ) { isGranted ->
-            if (isGranted) {
-                Timber.d("Microphone permission granted")
-                setupRecognizer()
-            } else {
-                Timber.w("Microphone permission denied")
-            }
-        }
-
-        if (ContextCompat.checkSelfPermission(
-                this,
-                permission,
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            permissionLauncher.launch(permission)
-        } else {
+        // The camera permission is requested by observeVisionSetting() once the saved vision setting is known
+        if (hasPermission(Manifest.permission.RECORD_AUDIO)) {
             setupRecognizer()
+        } else {
+            isPermissionRequestInFlight = true
+            permissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
         }
+
+        observeVisionSetting()
 
         setContent {
             GhostAITheme {
@@ -116,8 +137,38 @@ class MainActivity : ComponentActivity() {
                         onUpdateVoiceSettings = {
                             viewModel.updateVoiceSettings(it)
                         },
+                        onUpdateVisionEnabled = {
+                            viewModel.updateVisionEnabled(it)
+                        },
                     )
                 }
+            }
+        }
+    }
+
+    private fun hasPermission(permission: String): Boolean =
+        ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+
+    /** Binds the camera while vision is enabled and unbinds it when disabled, so the camera isn't held open needlessly. */
+    private fun observeVisionSetting() {
+        lifecycleScope.launch {
+            viewModel.savedVisionEnabled
+                .distinctUntilChanged()
+                .collect { enabled ->
+                    visionEnabled = enabled
+                    updateCameraBinding(enabled, requestPermissionIfNeeded = true)
+                }
+        }
+    }
+
+    private fun updateCameraBinding(visionEnabled: Boolean, requestPermissionIfNeeded: Boolean) {
+        val manager = cameraManager ?: return
+        when {
+            !visionEnabled -> manager.unbind()
+            hasPermission(Manifest.permission.CAMERA) -> manager.bindToLifecycle(this)
+            requestPermissionIfNeeded && !isPermissionRequestInFlight -> {
+                isPermissionRequestInFlight = true
+                permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
             }
         }
     }
@@ -143,6 +194,7 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         recognizerManager?.destroy()
         viewModel.stopListening()
+        cameraManager?.release()
         super.onDestroy()
     }
 }
@@ -159,6 +211,7 @@ fun GreetingPreview() {
             onHideVoiceSettings = {},
             onDismissMissingOpenAIKeyDialog = {},
             onUpdateVoiceSettings = {},
+            onUpdateVisionEnabled = {},
         )
     }
 }

@@ -12,6 +12,7 @@ import com.fourthwardai.ghostai.BuildConfig
 import com.fourthwardai.ghostai.audioeffects.GhostRenderersFactory
 import com.fourthwardai.ghostai.model.Emotion
 import com.fourthwardai.ghostai.model.GhostReply
+import com.fourthwardai.ghostai.network.SkipHttpLogging
 import com.fourthwardai.ghostai.network.ktorHttpClient
 import com.fourthwardai.ghostai.settings.TtsService
 import com.fourthwardai.ghostai.settings.Voice
@@ -33,14 +34,18 @@ import io.ktor.utils.io.jvm.javaio.toInputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 import timber.log.Timber
 import java.io.File
 import java.io.FileInputStream
 import java.util.Locale
 
-private const val LLM_MODEL = "gpt-4.1-mini"//"gpt-4-turbo"//"gpt-4o"
+private const val LLM_MODEL = "gpt-4.1-mini" // "gpt-4-turbo"//"gpt-4o"
 
 @Serializable
 data class ChatCompletionRequest(
@@ -66,23 +71,34 @@ class OpenAIService(
     private val application: Application,
 ) : AIService {
 
-    suspend fun getGhostReply(conversationHistory: List<ChatMessage>): GhostReply {
+    /**
+     * @param imageBase64 optional Base64 JPEG of what the ghost currently "sees". When present it is attached to the
+     * latest user message as vision content; it is never stored in [conversationHistory].
+     */
+    suspend fun getGhostReply(conversationHistory: List<ChatMessage>, imageBase64: String? = null): GhostReply {
         val messages = listOf(
             SystemMessage(GHOST_BACK_STORY_SYSTEM_PROMPT),
         ) + conversationHistory
 
-        Timber.d("CGH: size of messages = ${messages.count()}")
-        val request = ChatCompletionRequest(
-            model = LLM_MODEL,
-            messages = messages,
-        )
+        Timber.d("CGH: size of messages = ${messages.count()}, image attached = ${imageBase64 != null}")
 
         val replyText = try {
             val response: HttpResponse = client.post("https://api.openai.com/v1/chat/completions") {
                 headers {
                     append("Authorization", "Bearer $apiKey")
                 }
-                setBody(request)
+                if (imageBase64 != null) {
+                    // The Base64 image is ~40KB; logging it would flood logcat
+                    attributes.put(SkipHttpLogging, Unit)
+                    setBody(buildVisionRequest(messages, imageBase64))
+                } else {
+                    setBody(
+                        ChatCompletionRequest(
+                            model = LLM_MODEL,
+                            messages = messages,
+                        ),
+                    )
+                }
             }
 
             val completion = response.body<ChatCompletionResponse>()
@@ -93,6 +109,43 @@ class OpenAIService(
         }
 
         return parseEmotionTag(replyText.trim())
+    }
+
+    /**
+     * Builds the chat request by hand so the last user message can carry an image alongside its text.
+     * All other messages keep plain string content. Mirrors the fields of [ChatCompletionRequest].
+     */
+    private fun buildVisionRequest(messages: List<ChatMessage>, imageBase64: String): JsonObject {
+        val lastUserIndex = messages.indexOfLast { it is UserMessage }
+        return buildJsonObject {
+            put("model", LLM_MODEL)
+            put("temperature", 0.9)
+            putJsonArray("messages") {
+                messages.forEachIndexed { index, message ->
+                    addJsonObject {
+                        put("role", message.role)
+                        if (index == lastUserIndex) {
+                            putJsonArray("content") {
+                                addJsonObject {
+                                    put("type", "image_url")
+                                    putJsonObject("image_url") {
+                                        put("url", "data:image/jpeg;base64,$imageBase64")
+                                        // "low" costs ~85 tokens per image vs 1000+ for "high", keeping latency down
+                                        put("detail", "low")
+                                    }
+                                }
+                                addJsonObject {
+                                    put("type", "text")
+                                    put("text", message.content)
+                                }
+                            }
+                        } else {
+                            put("content", message.content)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     @OptIn(UnstableApi::class)

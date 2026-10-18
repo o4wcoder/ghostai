@@ -10,8 +10,12 @@ import io.ktor.client.plugins.logging.Logging
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
+import io.ktor.util.AttributeKey
 import kotlinx.serialization.json.Json
 import timber.log.Timber
+
+/** Mark a request with this attribute to keep it (and its response) out of the HTTP body log, e.g. image uploads. */
+val SkipHttpLogging = AttributeKey<Unit>("SkipHttpLogging")
 
 fun ktorHttpClient(): HttpClient {
     return HttpClient(OkHttp) {
@@ -29,6 +33,7 @@ fun ktorHttpClient(): HttpClient {
         install(Logging) {
             logger = KtorLogger()
             level = LogLevel.BODY
+            filter { request -> !request.attributes.contains(SkipHttpLogging) }
         }
 
         // Optional default headers
