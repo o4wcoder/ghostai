@@ -190,7 +190,8 @@ constructor(
                     }
                 }
                 addUserMessage(input)
-                val imageBase64 = imageDeferred.await()
+                // The user may have turned vision off while the frame was being captured/encoded; honor that
+                val imageBase64 = imageDeferred.await()?.takeIf { _ghostUiState.value.visionEnabled }
                 Timber.d("CGH: Calling getGhostReply @ ${System.currentTimeMillis()}, image = ${imageBase64 != null}")
                 val openAiResponse = openAIService.getGhostReply(conversationHistory, imageBase64)
                 ghostResponseChannel.send(openAiResponse)
