@@ -33,6 +33,7 @@ import io.ktor.http.isSuccess
 import io.ktor.utils.io.jvm.javaio.toInputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.addJsonObject
@@ -45,13 +46,16 @@ import java.io.File
 import java.io.FileInputStream
 import java.util.Locale
 
-private const val LLM_MODEL = "gpt-4.1-mini" // "gpt-4-turbo"//"gpt-4o"
+private const val LLM_MODEL = "gpt-6-luna" // "gpt-4.1-mini"
+
+// gpt-6-luna only accepts the default temperature; skip reasoning to keep spoken replies fast
+private const val REASONING_EFFORT = "none"
 
 @Serializable
 data class ChatCompletionRequest(
     val model: String = LLM_MODEL,
     val messages: List<ChatMessage>,
-    val temperature: Double = 0.9,
+    @SerialName("reasoning_effort") val reasoningEffort: String = REASONING_EFFORT,
 )
 
 @Serializable
@@ -119,7 +123,7 @@ class OpenAIService(
         val lastUserIndex = messages.indexOfLast { it is UserMessage }
         return buildJsonObject {
             put("model", LLM_MODEL)
-            put("temperature", 0.9)
+            put("reasoning_effort", REASONING_EFFORT)
             putJsonArray("messages") {
                 messages.forEachIndexed { index, message ->
                     addJsonObject {
