@@ -2,7 +2,10 @@ package com.fourthwardai.ghostai
 
 import android.content.Context
 import android.content.Intent
+import android.media.AudioManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -29,6 +32,15 @@ class SpeechRecognizerManager(
     private var isListening = false
     private var isStarting = false
 
+    /**
+     * Some recognizer services (e.g. on tablets) play a beep when listening starts and stops. There is no API to
+     * disable it, so the streams it plays on are muted for the duration of a listening session.
+     */
+    private val audioManager = context.getSystemService(AudioManager::class.java)
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val mutedStreams = mutableSetOf<Int>()
+    private val unmuteRunnable = Runnable { unmuteBeepStreams() }
+
     init {
         recognizer.setRecognitionListener(
             object : RecognitionListener {
@@ -50,6 +62,7 @@ class SpeechRecognizerManager(
                 override fun onError(error: Int) {
                     isListening = false
                     isStarting = false
+                    scheduleUnmute(SESSION_END_UNMUTE_DELAY_MS)
                     val message =
                         when (error) {
                             SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout"
@@ -71,6 +84,7 @@ class SpeechRecognizerManager(
                 override fun onResults(results: Bundle?) {
                     isListening = false
                     isStarting = false
+                    scheduleUnmute(SESSION_END_UNMUTE_DELAY_MS)
                     val resultText =
                         results
                             ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
@@ -103,15 +117,63 @@ class SpeechRecognizerManager(
         }
         isStarting = true
         Timber.d("CGH: SpeechRecognizerManager.startListening()")
+        muteBeepStreams()
         recognizer.startListening(intent)
     }
 
     fun stopListening() {
         Timber.d("CGH: SpeechRecognizerManager.stopListening()")
         recognizer.cancel()
+        // Shorter delay here since TTS playback typically follows a cancel
+        scheduleUnmute(CANCEL_UNMUTE_DELAY_MS)
     }
 
     fun destroy() {
         recognizer.destroy()
+        mainHandler.removeCallbacks(unmuteRunnable)
+        unmuteBeepStreams()
+    }
+
+    private fun muteBeepStreams() {
+        mainHandler.removeCallbacks(unmuteRunnable)
+        for (stream in BEEP_STREAMS) {
+            // Leave streams the user already muted alone so we don't unmute them later
+            if (stream in mutedStreams || audioManager.isStreamMute(stream)) continue
+            try {
+                audioManager.adjustStreamVolume(stream, AudioManager.ADJUST_MUTE, 0)
+                mutedStreams += stream
+            } catch (e: SecurityException) {
+                // Thrown for some streams while Do Not Disturb is active
+                Timber.w(e, "CGH: Unable to mute stream $stream")
+            }
+        }
+    }
+
+    private fun scheduleUnmute(delayMs: Long) {
+        mainHandler.removeCallbacks(unmuteRunnable)
+        mainHandler.postDelayed(unmuteRunnable, delayMs)
+    }
+
+    private fun unmuteBeepStreams() {
+        for (stream in mutedStreams) {
+            try {
+                audioManager.adjustStreamVolume(stream, AudioManager.ADJUST_UNMUTE, 0)
+            } catch (e: SecurityException) {
+                Timber.w(e, "CGH: Unable to unmute stream $stream")
+            }
+        }
+        mutedStreams.clear()
+    }
+
+    companion object {
+        private val BEEP_STREAMS = listOf(
+            AudioManager.STREAM_MUSIC,
+            AudioManager.STREAM_NOTIFICATION,
+            AudioManager.STREAM_SYSTEM,
+        )
+
+        // Long enough to cover the end-of-session beep and the view model's restart delay (~750ms)
+        private const val SESSION_END_UNMUTE_DELAY_MS = 1000L
+        private const val CANCEL_UNMUTE_DELAY_MS = 300L
     }
 }
