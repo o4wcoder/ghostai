@@ -72,6 +72,11 @@ class ElevenLabsService(
 ) : AIService {
     private var mediaPlayer: MediaPlayer? = null
     private var webSocket: WebSocket? = null
+
+    // Main thread only. Each reply gets its own player, which must be released or its AudioTrack leaks; after ~30
+    // leaked players Android refuses to create more ("Cannot create AudioTrack") and the ghost goes silent.
+    private var exoPlayer: ExoPlayer? = null
+    private var playbackFile: File? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     suspend fun synthesizeSpeech(text: String): ElevenLabsSpeechToTextResult {
@@ -148,9 +153,9 @@ class ElevenLabsService(
         callbacks: TtsCallbacks,
     ) {
         stopStreamingSpeech()
+        exoPlayer?.let { releasePlayer(it) }
 
         val buffer = ByteArrayOutputStream()
-        var exoPlayer: ExoPlayer? = null
 
         val request = Request.Builder()
             .url("wss://api.elevenlabs.io/v1/text-to-speech/$voiceId/stream-input")
@@ -180,36 +185,6 @@ class ElevenLabsService(
                         // Signal end of input (required so server knows you're done)
                         val endMsg = """{"text": ""}"""
                         webSocket.send(endMsg)
-
-                        // Set up ExoPlayer
-                        exoPlayer = ExoPlayer.Builder(application.applicationContext)
-                            .setRenderersFactory(GhostRenderersFactory(application.applicationContext))
-                            .build().apply {
-                                addListener(object : Player.Listener {
-                                    override fun onPlaybackStateChanged(state: Int) {
-                                        when (state) {
-                                            Player.STATE_READY -> {
-                                                if (exoPlayer?.playWhenReady == true) {
-                                                    callbacks.onStart()
-                                                }
-                                            }
-
-                                            Player.STATE_ENDED -> {
-                                                stopStreamingSpeech()
-                                                callbacks.onEnd()
-                                            }
-
-                                            else -> {}
-                                        }
-                                    }
-
-                                    override fun onPlayerError(error: PlaybackException) {
-                                        Timber.e(error, "ExoPlayer playback error")
-                                        stopStreamingSpeech()
-                                        callbacks.onError(error)
-                                    }
-                                })
-                            }
                     }
 
                     override fun onMessage(webSocket: WebSocket, text: String) {
@@ -227,7 +202,7 @@ class ElevenLabsService(
                             playBufferedMp3(
                                 application.applicationContext,
                                 buffer.toByteArray(),
-                                exoPlayer!!,
+                                callbacks,
                             )
                         }
 
@@ -257,20 +232,67 @@ class ElevenLabsService(
     }
 
     @OptIn(UnstableApi::class)
-    private fun playBufferedMp3(context: Context, mp3Data: ByteArray, exoPlayer: ExoPlayer) {
+    private fun playBufferedMp3(context: Context, mp3Data: ByteArray, callbacks: TtsCallbacks) {
         val tempFile = File.createTempFile("ghost_stream", ".mp3", context.cacheDir).apply {
             writeBytes(mp3Data)
             deleteOnExit()
         }
 
         scope.launch(Dispatchers.Main) {
+            exoPlayer?.let { releasePlayer(it) }
+
             val dataSourceFactory = DefaultDataSource.Factory(context)
             val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory)
                 .createMediaSource(MediaItem.fromUri(tempFile.toUri()))
 
-            exoPlayer.setMediaSource(mediaSource)
-            exoPlayer.prepare()
-            exoPlayer.play()
+            // Built on the main thread so all player calls and listener callbacks happen there
+            val player = ExoPlayer.Builder(context)
+                .setRenderersFactory(GhostRenderersFactory(context))
+                .build()
+            player.addListener(
+                object : Player.Listener {
+                    override fun onPlaybackStateChanged(state: Int) {
+                        when (state) {
+                            Player.STATE_READY -> {
+                                if (player.playWhenReady) {
+                                    callbacks.onStart()
+                                }
+                            }
+
+                            Player.STATE_ENDED -> {
+                                releasePlayer(player)
+                                stopStreamingSpeech()
+                                callbacks.onEnd()
+                            }
+
+                            else -> {}
+                        }
+                    }
+
+                    override fun onPlayerError(error: PlaybackException) {
+                        Timber.e(error, "ExoPlayer playback error")
+                        releasePlayer(player)
+                        stopStreamingSpeech()
+                        callbacks.onError(error)
+                    }
+                },
+            )
+            exoPlayer = player
+            playbackFile = tempFile
+
+            player.setMediaSource(mediaSource)
+            player.prepare()
+            player.play()
+        }
+    }
+
+    /** Must be called on the main thread. */
+    private fun releasePlayer(player: ExoPlayer) {
+        player.release()
+        if (exoPlayer === player) {
+            exoPlayer = null
+            playbackFile?.delete()
+            playbackFile = null
         }
     }
 
