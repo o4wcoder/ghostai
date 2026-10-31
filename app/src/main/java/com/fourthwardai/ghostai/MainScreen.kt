@@ -25,6 +25,7 @@ fun MainScreen(
     onDismissMissingOpenAIKeyDialog: () -> Unit,
     onUpdateVoiceSettings: (VoiceSettings) -> Unit,
     onUpdateVisionEnabled: (Boolean) -> Unit,
+    onUpdateGreetVisitorsEnabled: (Boolean) -> Unit,
 ) {
     Box(
         modifier = Modifier
@@ -43,10 +44,12 @@ fun MainScreen(
             isShowing = ghostUiState.showSettingsDialog,
             voiceSettings = ghostUiState.voiceSettings,
             visionEnabled = ghostUiState.visionEnabled,
+            greetVisitorsEnabled = ghostUiState.greetVisitorsEnabled,
             onDismiss = { onHideVoiceSettings() },
-            onConfirm = { voiceSettings, visionEnabled ->
+            onConfirm = { voiceSettings, visionEnabled, greetVisitorsEnabled ->
                 onUpdateVoiceSettings(voiceSettings)
                 onUpdateVisionEnabled(visionEnabled)
+                onUpdateGreetVisitorsEnabled(greetVisitorsEnabled)
             },
         )
 
@@ -69,6 +72,7 @@ private fun PreviewMainScreen() {
             onDismissMissingOpenAIKeyDialog = {},
             onUpdateVoiceSettings = {},
             onUpdateVisionEnabled = {},
+            onUpdateGreetVisitorsEnabled = {},
         )
     }
 }

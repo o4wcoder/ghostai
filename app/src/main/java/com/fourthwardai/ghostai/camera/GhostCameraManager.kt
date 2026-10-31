@@ -6,6 +6,7 @@ import android.graphics.Matrix
 import android.util.Base64
 import android.util.Size
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
@@ -36,15 +37,22 @@ class GhostCameraManager(context: Context) {
     private val appContext = context.applicationContext
     private val cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
 
+    // Separate thread so slow visitor detection never delays a photo capture callback
+    private val analysisExecutor: ExecutorService = Executors.newSingleThreadExecutor()
+
     @Volatile
     private var imageCapture: ImageCapture? = null
+    private var imageAnalysis: ImageAnalysis? = null
     private var cameraProvider: ProcessCameraProvider? = null
 
     // Binding completes asynchronously; this lets unbind() win if it's called before the bind lands.
     private var shouldBeBound = false
 
-    /** Must be called on the main thread. */
-    fun bindToLifecycle(lifecycleOwner: LifecycleOwner) {
+    /**
+     * Must be called on the main thread. When [visitorAnalyzer] is set, a low-resolution analysis stream is bound
+     * alongside the photo capture for Greet Visitors; otherwise the camera only produces frames on demand.
+     */
+    fun bindToLifecycle(lifecycleOwner: LifecycleOwner, visitorAnalyzer: ImageAnalysis.Analyzer? = null) {
         shouldBeBound = true
         val providerFuture = ProcessCameraProvider.getInstance(appContext)
         providerFuture.addListener(
@@ -73,12 +81,25 @@ class GhostCameraManager(context: Context) {
                         .setResolutionSelector(resolutionSelector)
                         .build()
 
+                    val analysis = visitorAnalyzer?.let { analyzer ->
+                        ImageAnalysis.Builder()
+                            .setResolutionSelector(analysisResolutionSelector())
+                            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                            .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+                            .build()
+                            .also { it.setAnalyzer(analysisExecutor, analyzer) }
+                    }
+
                     imageCapture?.let { provider.unbind(it) }
-                    provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_FRONT_CAMERA, capture)
+                    imageAnalysis?.let { provider.unbind(it) }
+                    val useCases = listOfNotNull(capture, analysis).toTypedArray()
+                    provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_FRONT_CAMERA, *useCases)
                     imageCapture = capture
-                    Timber.d("CGH: Camera bound for ghost sight")
+                    imageAnalysis = analysis
+                    Timber.d("CGH: Camera bound for ghost sight, visitor analysis = ${analysis != null}")
                 } catch (e: Exception) {
                     imageCapture = null
+                    imageAnalysis = null
                     Timber.e(e, "CGH: Failed to bind camera")
                 }
             },
@@ -122,6 +143,11 @@ class GhostCameraManager(context: Context) {
     /** Releases the camera so the OS camera indicator turns off. Must be called on the main thread. */
     fun unbind() {
         shouldBeBound = false
+        imageAnalysis?.let {
+            it.clearAnalyzer()
+            cameraProvider?.unbind(it)
+        }
+        imageAnalysis = null
         val capture = imageCapture ?: return
         imageCapture = null
         cameraProvider?.unbind(capture)
@@ -131,7 +157,18 @@ class GhostCameraManager(context: Context) {
     fun release() {
         unbind()
         cameraExecutor.shutdown()
+        analysisExecutor.shutdown()
     }
+
+    // The detector downsamples to 320x320 anyway, so the smallest stream keeps conversion cost and heat low
+    private fun analysisResolutionSelector() = ResolutionSelector.Builder()
+        .setResolutionStrategy(
+            ResolutionStrategy(
+                Size(320, 240),
+                ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER,
+            ),
+        )
+        .build()
 
     private suspend fun takePicture(capture: ImageCapture): Bitmap? = suspendCancellableCoroutine { cont ->
         capture.takePicture(

@@ -23,11 +23,13 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.fourthwardai.ghostai.camera.GhostCameraManager
+import com.fourthwardai.ghostai.camera.VisitorDetector
 import com.fourthwardai.ghostai.model.DeviceSettings
 import com.fourthwardai.ghostai.model.FormFactor
 import com.fourthwardai.ghostai.ui.theme.GhostAITheme
 import com.fourthwardai.ghostai.ui.theme.LocalWindowClassSize
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -37,10 +39,12 @@ class MainActivity : ComponentActivity() {
     private val viewModel: GhostViewModel by viewModels()
     private var recognizerManager: SpeechRecognizerManager? = null
     private var cameraManager: GhostCameraManager? = null
+    private var visitorDetector: VisitorDetector? = null
     private var isPermissionRequestInFlight = false
 
     // Null until the saved vision setting has loaded, so we never act on the default before knowing the user's choice
     private var visionEnabled: Boolean? = null
+    private var greetVisitorsEnabled = false
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -81,6 +85,7 @@ class MainActivity : ComponentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         cameraManager = GhostCameraManager(this).also { viewModel.setCameraManager(it) }
+        visitorDetector = VisitorDetector(this).also { viewModel.setVisitorDetector(it) }
 
         // The camera permission is requested by observeVisionSetting() once the saved vision setting is known
         if (hasPermission(Manifest.permission.RECORD_AUDIO)) {
@@ -140,6 +145,9 @@ class MainActivity : ComponentActivity() {
                         onUpdateVisionEnabled = {
                             viewModel.updateVisionEnabled(it)
                         },
+                        onUpdateGreetVisitorsEnabled = {
+                            viewModel.updateGreetVisitorsEnabled(it)
+                        },
                     )
                 }
             }
@@ -149,23 +157,31 @@ class MainActivity : ComponentActivity() {
     private fun hasPermission(permission: String): Boolean =
         ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
 
-    /** Binds the camera while vision is enabled and unbinds it when disabled, so the camera isn't held open needlessly. */
+    /**
+     * Binds the camera while vision is enabled and unbinds it when disabled, so the camera isn't held open needlessly.
+     * Greet Visitors adds a continuous analysis stream on top, so it's rebound when that setting changes too.
+     */
     private fun observeVisionSetting() {
         lifecycleScope.launch {
-            viewModel.savedVisionEnabled
+            combine(viewModel.savedVisionEnabled, viewModel.savedGreetVisitorsEnabled) { vision, greet -> vision to greet }
                 .distinctUntilChanged()
-                .collect { enabled ->
-                    visionEnabled = enabled
-                    updateCameraBinding(enabled, requestPermissionIfNeeded = true)
+                .collect { (vision, greet) ->
+                    visionEnabled = vision
+                    greetVisitorsEnabled = greet
+                    updateCameraBinding(vision, requestPermissionIfNeeded = true)
                 }
         }
     }
 
     private fun updateCameraBinding(visionEnabled: Boolean, requestPermissionIfNeeded: Boolean) {
         val manager = cameraManager ?: return
+        val analyzeVisitors = visionEnabled && greetVisitorsEnabled
+        // Free the detection model while it isn't needed; it's recreated on the first analyzed frame
+        if (!analyzeVisitors) visitorDetector?.reset()
         when {
             !visionEnabled -> manager.unbind()
-            hasPermission(Manifest.permission.CAMERA) -> manager.bindToLifecycle(this)
+            hasPermission(Manifest.permission.CAMERA) ->
+                manager.bindToLifecycle(this, visitorAnalyzer = visitorDetector.takeIf { analyzeVisitors })
             requestPermissionIfNeeded && !isPermissionRequestInFlight -> {
                 isPermissionRequestInFlight = true
                 permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
@@ -195,6 +211,7 @@ class MainActivity : ComponentActivity() {
         recognizerManager?.destroy()
         viewModel.stopListening()
         cameraManager?.release()
+        visitorDetector?.reset()
         super.onDestroy()
     }
 }
@@ -212,6 +229,7 @@ fun GreetingPreview() {
             onDismissMissingOpenAIKeyDialog = {},
             onUpdateVoiceSettings = {},
             onUpdateVisionEnabled = {},
+            onUpdateGreetVisitorsEnabled = {},
         )
     }
 }

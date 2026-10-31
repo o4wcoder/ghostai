@@ -54,6 +54,10 @@ android {
         compose = true
         buildConfig = true
     }
+    androidResources {
+        // MediaPipe memory-maps the person detection model, which requires it to be stored uncompressed
+        noCompress += "tflite"
+    }
 }
 
 dependencies {
@@ -80,6 +84,7 @@ dependencies {
     implementation(libs.camera.core)
     implementation(libs.camera.camera2)
     implementation(libs.camera.lifecycle)
+    implementation(libs.mediapipe.tasks.vision)
 
     ksp(libs.hilt.compiler)
 

@@ -7,6 +7,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.fourthwardai.ghostai.camera.GhostCameraManager
 import com.fourthwardai.ghostai.camera.VisionPreferenceService
+import com.fourthwardai.ghostai.camera.VisitorDetector
 import com.fourthwardai.ghostai.model.ConversationState
 import com.fourthwardai.ghostai.model.Emotion
 import com.fourthwardai.ghostai.model.GhostReply
@@ -61,6 +62,7 @@ constructor(
     private val tts: TextToSpeech
     private var speechRecognizerManager: SpeechRecognizerManager? = null
     private var ghostCameraManager: GhostCameraManager? = null
+    private var visitorDetector: VisitorDetector? = null
     private var isRecoveringRecognizer = false
     private var userTalkingTimeoutJob: Job? = null
 
@@ -143,6 +145,11 @@ constructor(
                 _ghostUiState.update { it.copy(visionEnabled = enabled) }
             }
         }
+        viewModelScope.launch {
+            visionPrefs.greetVisitorsEnabled.collect { enabled ->
+                _ghostUiState.update { it.copy(greetVisitorsEnabled = enabled) }
+            }
+        }
     }
 
     fun updateVisionEnabled(enabled: Boolean) {
@@ -150,6 +157,17 @@ constructor(
         _ghostUiState.update { it.copy(visionEnabled = enabled) }
         viewModelScope.launch {
             visionPrefs.setVisionEnabled(enabled)
+        }
+    }
+
+    /** The saved greet-visitors setting. Like [savedVisionEnabled], it never emits a default before loading. */
+    val savedGreetVisitorsEnabled: Flow<Boolean> = visionPrefs.greetVisitorsEnabled
+
+    fun updateGreetVisitorsEnabled(enabled: Boolean) {
+        Timber.d("CGH: Greet visitors enabled = $enabled")
+        _ghostUiState.update { it.copy(greetVisitorsEnabled = enabled) }
+        viewModelScope.launch {
+            visionPrefs.setGreetVisitorsEnabled(enabled)
         }
     }
 
@@ -231,6 +249,11 @@ constructor(
 
     fun setCameraManager(manager: GhostCameraManager) {
         ghostCameraManager = manager
+    }
+
+    fun setVisitorDetector(detector: VisitorDetector) {
+        visitorDetector = detector
+        detector.isPaused = _ghostUiState.value.conversationState != ConversationState.Idle
     }
 
     fun setSpeechRecognizer(manager: SpeechRecognizerManager) {
@@ -411,6 +434,8 @@ constructor(
     private fun updateConversationState(state: ConversationState) {
         Timber.d("CGH: updateConversationState @ ${System.currentTimeMillis()} - state ${_ghostUiState.value.conversationState}")
         _ghostUiState.update { it.copy(conversationState = state) }
+        // Visitors are only greeted when idle, so skip detection (and its CPU cost) the rest of the time
+        visitorDetector?.isPaused = state != ConversationState.Idle
     }
 
     fun addUserMessage(userInput: UserInput) {

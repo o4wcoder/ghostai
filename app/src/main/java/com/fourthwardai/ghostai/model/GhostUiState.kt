@@ -11,6 +11,7 @@ data class GhostUiState(
     val showSettingsDialog: Boolean = false,
     val showMissingOpenAIKeyDialog: Boolean = false,
     val visionEnabled: Boolean = true,
+    val greetVisitorsEnabled: Boolean = false,
     val voiceSettings: VoiceSettings,
 ) {
     val isSpeaking: Boolean = conversationState == ConversationState.GhostTalking

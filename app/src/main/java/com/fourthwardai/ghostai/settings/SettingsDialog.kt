@@ -29,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -42,13 +43,15 @@ fun VoiceSettingsDialog(
     isShowing: Boolean,
     voiceSettings: VoiceSettings,
     visionEnabled: Boolean,
+    greetVisitorsEnabled: Boolean,
     onDismiss: () -> Unit,
-    onConfirm: (VoiceSettings, Boolean) -> Unit,
+    onConfirm: (voiceSettings: VoiceSettings, visionEnabled: Boolean, greetVisitorsEnabled: Boolean) -> Unit,
 ) {
     if (!isShowing) return
 
     var currentVoiceSettings by remember { mutableStateOf(voiceSettings) }
     var currentVisionEnabled by remember { mutableStateOf(visionEnabled) }
+    var currentGreetVisitorsEnabled by remember { mutableStateOf(greetVisitorsEnabled) }
 
     val voicesForService =
         currentVoiceSettings.voicesByService[currentVoiceSettings.selectedService].orEmpty()
@@ -114,26 +117,18 @@ fun VoiceSettingsDialog(
                 Text(stringResource(R.string.vision), style = MaterialTheme.typography.labelSmall)
                 Spacer(Modifier.height(8.dp))
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        // One accessible control: TalkBack reads the label together with the on/off state
-                        .toggleable(
-                            value = currentVisionEnabled,
-                            role = Role.Switch,
-                            onValueChange = { currentVisionEnabled = it },
-                        )
-                        .padding(vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        stringResource(R.string.vision_toggle_label),
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Switch(checked = currentVisionEnabled, onCheckedChange = null)
-                }
+                SettingSwitchRow(
+                    label = stringResource(R.string.vision_toggle_label),
+                    checked = currentVisionEnabled,
+                    onCheckedChange = { currentVisionEnabled = it },
+                )
+                // Greeting visitors needs the camera, so it's only available (and only takes effect) with vision on
+                SettingSwitchRow(
+                    label = stringResource(R.string.greet_visitors_toggle_label),
+                    checked = currentGreetVisitorsEnabled && currentVisionEnabled,
+                    enabled = currentVisionEnabled,
+                    onCheckedChange = { currentGreetVisitorsEnabled = it },
+                )
             }
         },
         confirmButton = {
@@ -141,9 +136,11 @@ fun VoiceSettingsDialog(
                 // With no voices loaded the voice selection can't be saved, but the vision toggle still can
                 onClick = {
                     val voiceSettingsToSave = if (voicesForService.isNotEmpty()) currentVoiceSettings else voiceSettings
-                    onConfirm(voiceSettingsToSave, currentVisionEnabled)
+                    onConfirm(voiceSettingsToSave, currentVisionEnabled, currentGreetVisitorsEnabled)
                 },
-                enabled = voicesForService.isNotEmpty() || currentVisionEnabled != visionEnabled,
+                enabled = voicesForService.isNotEmpty() ||
+                    currentVisionEnabled != visionEnabled ||
+                    currentGreetVisitorsEnabled != greetVisitorsEnabled,
             ) {
                 Text(
                     stringResource(R.string.save),
@@ -152,6 +149,37 @@ fun VoiceSettingsDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
+}
+
+@Composable
+private fun SettingSwitchRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean = true,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            // One accessible control: TalkBack reads the label together with the on/off state
+            .toggleable(
+                value = checked,
+                enabled = enabled,
+                role = Role.Switch,
+                onValueChange = onCheckedChange,
+            )
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (enabled) Color.Unspecified else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+            modifier = Modifier.weight(1f),
+        )
+        Spacer(Modifier.width(8.dp))
+        Switch(checked = checked, onCheckedChange = null, enabled = enabled)
+    }
 }
 
 @Composable
@@ -240,7 +268,8 @@ fun TtsSettingsDialogPreview() {
         isShowing = true,
         voiceSettings = VoiceSettings(selectedService, selectedVoiceId, voicesByService),
         visionEnabled = true,
+        greetVisitorsEnabled = false,
         onDismiss = {},
-        onConfirm = { _, _ -> },
+        onConfirm = { _, _, _ -> },
     )
 }
